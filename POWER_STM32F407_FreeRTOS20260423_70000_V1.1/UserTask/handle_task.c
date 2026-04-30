@@ -1,0 +1,230 @@
+#include "handle_task.h"
+#include "includes.h"
+#include <stdlib.h>   
+#include <math.h>     
+
+#define HANDLE_PRINTF(format, ...)     //Debug_Printf("【HANDLE_TASK】:"format "\r\n",##__VA_ARGS__)
+
+/* HANDLE_TASK 任务配置 */
+#define HANDLE_PRIO      	CONFIG_HANDLE_PRIO                   		    
+#define HANDLE_STK_SIZE  	CONFIG_HANDLE_STK_SIZE                         
+TaskHandle_t            HANDLETask_Handler;  							
+void HANDLE_TASK(void *pvParameters);             						
+
+/************************* 手柄接口2硬件资源定义 *************************/
+uint8_t handle2_Rxbff[LEN] = "";
+HANDLE	handle = {0,0,0,0};
+
+const char handle_link2[] = {0x48,0x44,0x31,0x0D,0x0A};		//手柄2连接，未选择使用
+const char handle_select2[] = {0x55,0x53,0x31,0x0D,0x0A};	//手柄2连接，并选择使用
+const char pumpuser2[] 	= {0x50,0x55,0x31,0x0D,0x0A};		//手柄2蠕动泵正在使用
+
+/************************* 可配置参数宏 *************************/
+#define HANDLE2_SEND_INTERVAL    100     // 常规发送间隔：100ms
+#define UART5_REINIT_INTERVAL      300000  // 串口重初始化间隔：5分钟=5*60*1000ms
+
+/************************* 状态机枚举定义 *************************/
+typedef enum {
+    HANDLE2_IDLE = 0,           // 空闲状态
+    HANDLE2_SEND_PUMP,          // 发送蠕动泵指令
+    HANDLE2_SEND_SELECT,        // 发送手柄选择指令
+    HANDLE2_SEND_LINK,          // 发送常规连接指令
+    HANDLE2_WAIT_RESP,          // 等待设备响应
+    HANDLE2_CHECK_RESP,         // 校验响应数据
+    HANDLE2_UART_REINIT,        // 串口安全重初始化状态
+} Handle2_StateTypeDef;
+
+/*************************手柄接口2 核心业务函数 *************************/
+void handle2_link_status(void)
+{
+    static Handle2_StateTypeDef state = HANDLE2_IDLE;
+    static uint32_t last_send_tick = 0;    // 上次发送的时间戳
+    static uint32_t last_reinit_tick = 0;  // 上次串口初始化的时间戳
+    static uint8_t  retry_cnt = 0;          // 通讯失败重试计数
+    static uint8_t  uart_reinit_req = 0;    // 串口重初始化请求标志
+    static Handle2_StateTypeDef last_send_state = HANDLE2_SEND_LINK; // 记录上次发送的指令类型
+
+    uint32_t current_tick = xTaskGetTickCount();
+
+    // ===================== 1. 5分钟定时触发串口重初始化请求 =====================
+    if ((current_tick - last_reinit_tick >= UART5_REINIT_INTERVAL) && (uart_reinit_req == 0))
+    {
+        uart_reinit_req = 1;  // 标记需要初始化，等待当前通讯周期结束后执行
+        last_reinit_tick = current_tick;
+    }
+
+    // ===================== 2. 100ms定时发送触发（非阻塞） =====================
+    if ((state == HANDLE2_IDLE) && (current_tick - last_send_tick >= HANDLE2_SEND_INTERVAL))
+    {
+        // 有初始化请求，优先进入初始化流程
+        if (uart_reinit_req == 1)
+        {
+            state = HANDLE2_UART_REINIT;
+        }
+        // 无初始化请求，按业务逻辑选择发送的指令
+        else if (footvar.pump_tims_global_power && hmivar.handel == 2)
+        {
+            state = HANDLE2_SEND_PUMP;
+            last_send_state = HANDLE2_SEND_PUMP;
+        }
+        else if (hmivar.handel == 2)
+        {
+            state = HANDLE2_SEND_SELECT;
+            last_send_state = HANDLE2_SEND_SELECT;
+        }
+        else
+        {
+            state = HANDLE2_SEND_LINK;
+            last_send_state = HANDLE2_SEND_LINK;
+        }
+        last_send_tick = current_tick; // 更新发送时间戳
+    }
+
+    // ===================== 3. 状态机核心流程 =====================
+    switch (state)
+    {
+        // --------------------- 串口安全重初始化流程 ---------------------
+        case HANDLE2_UART_REINIT:
+        {
+            // 步骤1：停止DMA发送，避免初始化冲突
+            HAL_UART_DMAStop(&huart5);
+            
+            // 步骤2：清空所有收发缓冲区，重置接收长度
+            memset(handle2_Rxbff, 0, LEN * sizeof(char));
+            HandleClearSerialBuffer(HandleUsart);
+            HandleUsartRxLen = 0;
+
+            // 步骤3：安全执行串口初始化（使用你定义的宏）
+            HandleUsart_Init(115200);
+
+            // 步骤4：重置标志位和重试计数
+            uart_reinit_req = 0;
+            retry_cnt = 0;
+
+            // 步骤5：初始化完成，回到空闲状态，下一个200ms周期自动发送
+            state = HANDLE2_IDLE;
+            break;
+        }
+
+        // --------------------- 发送蠕动泵指令 ---------------------
+        case HANDLE2_SEND_PUMP:
+            memset(handle2_Rxbff, 0, LEN * sizeof(char));
+            HandleUsart_Transmit(HandleUsart, (char *)pumpuser2, sizeof(pumpuser2));
+            state = HANDLE2_WAIT_RESP;
+            break;
+
+        // --------------------- 发送手柄选择指令 ---------------------
+        case HANDLE2_SEND_SELECT:
+            memset(handle2_Rxbff, 0, LEN * sizeof(char));
+            HandleUsart_Transmit(HandleUsart, (char *)handle_select2, sizeof(handle_select2));
+            state = HANDLE2_WAIT_RESP;
+            break;
+
+        // --------------------- 发送常规连接指令 ---------------------
+        case HANDLE2_SEND_LINK:
+            memset(handle2_Rxbff, 0, LEN * sizeof(char));
+            HandleUsart_Transmit(HandleUsart, (char *)handle_link2, sizeof(handle_link2));
+            state = HANDLE2_WAIT_RESP;
+            break;
+
+        // --------------------- 等待设备响应 ---------------------
+        case HANDLE2_WAIT_RESP:
+            // 有数据接收，拷贝数据进入校验
+            if (HandleUsartRxLen > 0)
+            {
+                HandleCopySerialData(HandleUsart, (char *)handle2_Rxbff, sizeof(handle2_Rxbff));
+                HandleClearSerialBuffer(HandleUsart);
+                HandleUsartRxLen = 0;
+                state = HANDLE2_CHECK_RESP;
+            }
+            // 无数据，超时进入校验（判定本次通讯失败）
+            else if (current_tick - last_send_tick >= HANDLE2_SEND_INTERVAL / 2)
+            {
+                state = HANDLE2_CHECK_RESP;
+            }
+            break;
+
+        // --------------------- 校验响应数据 ---------------------
+        case HANDLE2_CHECK_RESP:
+        {
+            uint8_t comm_ok = 0;
+
+            // 根据发送的指令类型，匹配对应的响应校验规则
+            if (last_send_state == HANDLE2_SEND_PUMP)
+            {
+                if ((handle2_Rxbff[0] == 0x50) && (handle2_Rxbff[1] == 0x55))
+                    comm_ok = 1;
+            }
+            else if (last_send_state == HANDLE2_SEND_SELECT)
+            {
+                if ((handle2_Rxbff[0] == 0x55) && (handle2_Rxbff[1] == 0x53))
+                    comm_ok = 1;
+            }
+            else // HANDLE2_SEND_LINK
+            {
+                if ((handle2_Rxbff[0] == 0x48) && (handle2_Rxbff[1] == 0x44))
+                    comm_ok = 1;
+            }
+            // 通讯成功处理
+            if (comm_ok)
+            {
+                retry_cnt = 0;
+                handle.Link2 = 1; // 标记通讯正常
+				switch(handle2_Rxbff[2])
+				{
+					case 0x31: handle.Link2_Numb = 1; break;
+					case 0x32: handle.Link2_Numb = 2; break;
+					case 0x33: handle.Link2_Numb = 3; break;
+					default:break;
+				}
+            }
+            // 通讯失败处理
+            else
+            {
+                retry_cnt++;
+                // 连续3次失败，标记离线
+                if (retry_cnt > 2)
+                {
+                    retry_cnt = 0;
+                    handle.Link2 = 0;
+					handle.Link2_Numb = 0; 
+                }
+            }
+            // 校验完成，回到空闲状态，等待下一个200ms周期
+            state = HANDLE2_IDLE;
+            break;
+        }
+
+        // 异常状态兜底，回到空闲
+        default:
+            state = HANDLE2_IDLE;
+            break;
+    }
+}
+
+/************************* 任务初始化函数 *************************/
+void handle_task_init(void)
+{
+	taskENTER_CRITICAL();           
+    xTaskCreate((TaskFunction_t )HANDLE_TASK,
+                (const char*    )"HANDLE_TASK",
+                (uint16_t       )HANDLE_STK_SIZE,
+                (void*          )NULL,
+                (UBaseType_t    )HANDLE_PRIO,
+                (TaskHandle_t*  )&HANDLETask_Handler);
+    taskEXIT_CRITICAL();            
+}
+
+/************************* 任务主函数 *************************/
+void HANDLE_TASK(void *pvParameters)
+{
+	// 任务启动时，仅初始化一次串口
+	HandleUsart_Init(115200);
+	vTaskDelay(1000);
+    while(1)
+    {
+		handle2_link_status();	// 状态机核心循环
+		vTaskDelay(1);
+    }
+}
+
