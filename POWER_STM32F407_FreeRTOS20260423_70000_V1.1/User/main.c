@@ -47,7 +47,7 @@ void start_task(void *pvParameters);        					  /* 任务函数 */
 // 堆栈溢出监测 钩子
 void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
 {
-    //if( pcTaskName!=NULL ) printf("!!!任务:%s 堆栈溢出!!!\r\n", pcTaskName);
+    if( pcTaskName!=NULL ) printf("!!!任务:%s 堆栈溢出!!!\r\n", pcTaskName);
 }
 
 
