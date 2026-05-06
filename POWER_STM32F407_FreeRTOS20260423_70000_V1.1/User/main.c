@@ -47,7 +47,7 @@ void start_task(void *pvParameters);        					  /* 任务函数 */
 // 堆栈溢出监测 钩子
 void vApplicationStackOverflowHook( TaskHandle_t xTask, char *pcTaskName )
 {
-    if( pcTaskName!=NULL ) printf("!!!任务:%s 堆栈溢出!!!\r\n", pcTaskName);
+    //if( pcTaskName!=NULL ) printf("!!!任务:%s 堆栈溢出!!!\r\n", pcTaskName);
 }
 
 
@@ -125,7 +125,7 @@ void start_task(void *pvParameters)
 	led_task_init();
 	handle_task_init();
 	pc_task_init();
-	//iwdg_init(IWDG_PRESCALER_64,2000);
+	iwdg_init(IWDG_PRESCALER_64,2000);
 	while(1)
 	{
 		/* LED0闪烁 */
@@ -137,7 +137,7 @@ void start_task(void *pvParameters)
 		LED1 = 0;
 		LED2 = 0;
 		vTaskDelay(500);                                           /* 延时1000ticks */
-		//iwdg_feed();		//喂狗时间
+		iwdg_feed();		//喂狗时间
 	}
 
 }
