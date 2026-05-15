@@ -31,7 +31,7 @@
 
 
 //调试口开关
-#define HMI_PRINTF(format, ...)     //Debug_Printf("【HMI_TASK】:"format "\r\n",##__VA_ARGS__)
+#define HMI_PRINTF(format, ...)     Debug_Printf("【HMI_TASK】:"format "\r\n",##__VA_ARGS__)
 
 
 
@@ -406,7 +406,6 @@ void Handle_selection_settings(uint8_t  seq)
 		vTaskDelay(200);
 		hmivar.handelsta = 0; //发送停止指令完成
 		hmivar.handel = 1;	//选择手柄1
-		
 	}
 	else if(seq == 2)
 	{
@@ -1579,6 +1578,7 @@ void HmiPatternUpdate(void)
 /************************ 你原有的发送图标函数（完全保留） ************************/
 static void SendPumpDriveIcon(void)
 {
+	HMI_PRINTF("footvar.pump_powerflag = %d",footvar.pump_powerflag);
     if (footvar.pump_powerflag == 1)   // 电源开启 → 发送“运行”图标
     {
 		HMI_PRINTF("footvar.pump_powerflag = %d",footvar.pump_powerflag);
@@ -1664,6 +1664,8 @@ void HmiPumpSlideProcess(void)
 				vTaskDelay(5);
 				HMI_PRINTF("delay_whether = %d",delay_whether);
 				footvar.pumpautomaticflag = 0;
+				delay_whether = 0;
+				slide_phase = 0;
 			}
 		}
     }

@@ -17,7 +17,7 @@
 #define     SUCC				0		//成功
 #define 	LEN					255		//缓冲区长度
 
-
+#define 	MOTOR_COCK_TIME_MS					10		//堵转时间判定
 
 //电机控制串口
 #define		DynsyUsart					2

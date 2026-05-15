@@ -300,17 +300,26 @@ static void JudgeDataSendType(void)
 {
 	switch(dataSendType)
 	{								
-		case 1:   pump_running_speed_send(-200);								break;//一档速度
-		case 2:   pump_running_speed_send(-500);							break;//二档速度
-		case 3:   pump_running_speed_send(-1000);							break;//三档速度
+//		case 1:   pump_running_speed_send(-200);								break;//一档速度
+//		case 2:   pump_running_speed_send(-500);							break;//二档速度
+//		case 3:   pump_running_speed_send(-1000);							break;//三档速度
+//		case 4:   pump_enable_send(); vTaskDelay(600); pump_on_send();		break;//开始运行
+//		case 5:   pump_off_send(); vTaskDelay(300);	  pump_release_send();	break;//停止运行
+//		case 6:   pump_running_speed_send(-1500);							break;//四档速度
+//		case 7:   pump_running_speed_send(-2000);							break;//五档速度	
+//		case 8:   pump_running_speed_send(-2500);							break;//六档速度
+//		case 9:   pump_running_speed_send(-3000);							break;//七档速度		
+//		default:															break;
+		case 1:   pump_running_speed_send(PMP_LV1);								break;//一档速度
+		case 2:   pump_running_speed_send(PMP_LV2);							break;//二档速度
+		case 3:   pump_running_speed_send(PMP_LV3);							break;//三档速度
 		case 4:   pump_enable_send(); vTaskDelay(600); pump_on_send();		break;//开始运行
 		case 5:   pump_off_send(); vTaskDelay(300);	  pump_release_send();	break;//停止运行
-		case 6:   pump_running_speed_send(-1500);							break;//四档速度
-		case 7:   pump_running_speed_send(-2000);							break;//五档速度	
-		case 8:   pump_running_speed_send(-2500);							break;//六档速度
-		case 9:   pump_running_speed_send(-3000);							break;//七档速度		
+		case 6:   pump_running_speed_send(PMP_LV4);							break;//四档速度
+		case 7:   pump_running_speed_send(PMP_LV5);							break;//五档速度	
+		case 8:   pump_running_speed_send(PMP_LV6);							break;//六档速度
+		case 9:   pump_running_speed_send(PMP_LV7);							break;//七档速度		
 		default:															break;
-		
 	}
 }
 

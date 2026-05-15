@@ -21,6 +21,14 @@
 #define		RS485PUMP_Usart_Init			Usart6_Dma2_Init
 
 
+#define PMP_LV1			-2000
+#define PMP_LV2			-6000
+#define PMP_LV3			-10000
+#define PMP_LV4			-14000
+#define PMP_LV5			-18000
+#define PMP_LV6			-22000
+#define PMP_LV7			-26000
+
 
 typedef struct{
 	uint8_t pumpflag; //蠕动泵连接标志位 0 未连接 1 已连接 

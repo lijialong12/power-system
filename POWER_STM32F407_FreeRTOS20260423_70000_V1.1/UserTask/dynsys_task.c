@@ -542,7 +542,7 @@ void DynsysUpdate(void)
 														abc++;
 														DynsyTim_Stop();
 
-														if(abc > 3)
+														if(abc > MOTOR_COCK_TIME_MS)
 														{
 															abc = 0;
 															DynsySta.StaRece = NOTROTAT;//电机不转，线路或者问题
