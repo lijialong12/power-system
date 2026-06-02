@@ -29,15 +29,6 @@
 #define		DynsyUsart_Init				Usart2_Dma1_Init
 
 
-//传感器数据接受串口
-//#define		RS485SENSOR_Usart					2
-//#define       RS485SENSOR_Usart_Transmit			Usart_Transmit
-//#define       RS485SENSOR_UsartRxLen   			UsartRxLen2	
-//#define       RS485SENSOR_CopySerialData   		CopySerialData	
-//#define       RS485SENSOR_ClearSerialBuffer   	ClearSerialBuffer
-//#define       RS485SENSOR_UsartTxflag				UsartTxflag2
-//#define		RS485SENSOR_Usart_Init				Usart2_Dma1_Init
-
 
 //定时器
 #define		DynsyTim_Stop				Tim6_Stop

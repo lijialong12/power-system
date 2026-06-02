@@ -31,7 +31,7 @@
 
 
 //调试口开关
-#define HMI_PRINTF(format, ...)     Debug_Printf("【HMI_TASK】:"format "\r\n",##__VA_ARGS__)
+#define HMI_PRINTF(format, ...)     //Debug_Printf("【HMI_TASK】:"format "\r\n",##__VA_ARGS__)
 
 
 
@@ -156,6 +156,10 @@ const unsigned char fault_motor4[] = {0xEE,0xB1,0x23,0x00,0x00,0x00,0x06,0x05,0x
 const unsigned char fault_motor5[] = {0xEE,0xB1,0x23,0x00,0x00,0x00,0x06,0x06,0xFF,0xFC,0xFF,0xFF};	//电机故障05
 const unsigned char fault_motor6[] = {0xEE,0xB1,0x23,0x00,0x00,0x00,0x06,0x07,0xFF,0xFC,0xFF,0xFF};	//电机故障06
 const unsigned char fault_motor7[] = {0xEE,0xB1,0x23,0x00,0x00,0x00,0x06,0x08,0xFF,0xFC,0xFF,0xFF};	//电机过流
+
+
+const unsigned char force_sensoff[] = {0xEE,0xB1,0x10,0x00,0x03,0x00,0x06,0x00,0xFF,0xFC,0xFF,0xFF};		//反转按钮弹起
+const unsigned char force_senson[] = {0xEE,0xB1,0x10,0x00,0x03,0x00,0x06,0x01,0xFF,0xFC,0xFF,0xFF};	//反转按钮按下
 
 //通讯初始化
 uint8_t hmi_init(void)
@@ -1084,15 +1088,15 @@ void HmiReceiveDate(void)
 									HmiClearSerialBuffer(HmiUsart);
 									break;
 							}
-				case 0x0C:	
+				case 0x0C:		//关闭力传感功能
 							{
-								
+								footvar.pressensor = 0;
 								HmiClearSerialBuffer(HmiUsart);
 								break;
 							}
-				case 0x0D:
+				case 0x0D:		//打开力传感功能
 							{
-
+								footvar.pressensor = 1;
 								HmiClearSerialBuffer(HmiUsart);
 								break;
 							}
@@ -1876,10 +1880,16 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 			switch(handle.Link1_Numb)	
 			{
 				case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
-						vTaskDelay(10);  	   
+						vTaskDelay(10); 
+						footvar.pressensor = 1;		//开启力传感
+						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
+						vTaskDelay(5);  				
 						break;
 				case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
-						vTaskDelay(10);  	   
+						vTaskDelay(10);  
+						footvar.pressensor = 0;		//关闭力传感
+						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
+						vTaskDelay(5); 						
 						break;
 				case 3: break;
 				default:break;
@@ -1892,17 +1902,21 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 		else if((!handle.Link1) && handle.Link2)
 		{
 			HMI_PRINTF("2亮");
+			HmiUsart_Transmit(HmiUsart,(char *)handejoin2,sizeof(handejoin2)); //选择手柄接口2
+			vTaskDelay(5);                                               /* 延时1ticks */	
 			switch(handle.Link2_Numb)	//判断手柄序号
 			{
 				case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
 						vTaskDelay(5);  
-						HmiUsart_Transmit(HmiUsart,(char *)handejoin1,sizeof(handejoin1)); //选择手柄接口1
-						vTaskDelay(5);                                               /* 延时1ticks */				
+						footvar.pressensor = 1;		//开启力传感
+						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
+						vTaskDelay(5);  				
 						break;
 				case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
 						vTaskDelay(5);  
-						HmiUsart_Transmit(HmiUsart,(char *)handejoin2,sizeof(handejoin2)); //选择手柄接口2
-						vTaskDelay(5);                                               /* 延时1ticks */				
+						footvar.pressensor = 0;		//关闭力传感
+						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
+						vTaskDelay(5); 				
 						break;
 				case 3: break;
 				default:break;
@@ -1912,18 +1926,21 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 		else if(handle.Link1 && (!handle.Link2))
 		{
 			HMI_PRINTF("1亮");
-
+			HmiUsart_Transmit(HmiUsart,(char *)handejoin1,sizeof(handejoin1)); //选择手柄接口1
+			vTaskDelay(5);                                               /* 延时1ticks */
 			switch(handle.Link1_Numb) //判断手柄序号
 			{
 				case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
 						vTaskDelay(5);  
-						HmiUsart_Transmit(HmiUsart,(char *)handejoin1,sizeof(handejoin1)); //选择手柄接口1
-						vTaskDelay(5);                                               /* 延时1ticks */				
+						footvar.pressensor = 1;		//开启力传感
+						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
+						vTaskDelay(5);  
 						break;
 				case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
 						vTaskDelay(5);  
-						HmiUsart_Transmit(HmiUsart,(char *)handejoin2,sizeof(handejoin2)); //选择手柄接口2
-						vTaskDelay(5);                                               /* 延时1ticks */				
+						footvar.pressensor = 0;		//关闭力传感
+						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
+						vTaskDelay(5); 
 						break;
 				case 3: break;
 				default:break;
@@ -1956,7 +1973,9 @@ void HmiErrorUpdate(void)
 		{
 			Errorsta = 1;
 			Tim3_Start();
-			
+			if(pumpsta.gear == 10){pumpsta.gear = 0;}
+			if(pumpsta.run == 4){pumpsta.run = 0;}
+			if(pumpsta.stop == 4){pumpsta.stop = 0;}
 			Errornumber = 0;
 			HmiUsart_Transmit(HmiUsart,(char *)fault_pump2,sizeof(fault_pump2));vTaskDelay(5);
 		}
@@ -1973,7 +1992,6 @@ void HmiErrorUpdate(void)
 			Errornumber = 0;
 			HmiUsart_Transmit(HmiUsart,(char *)fault_pump1,sizeof(fault_pump1));vTaskDelay(5);
 		}
-		
 	}
 	//电机相关故障
 	else if(DynsySta.StaRece == 2 || DynsySta.StaRece == 9 || DynsySta.StaRece == 10 || DynsySta.StaRece == 11)	//过流

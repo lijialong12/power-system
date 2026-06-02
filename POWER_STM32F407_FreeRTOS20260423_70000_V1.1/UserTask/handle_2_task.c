@@ -1,4 +1,4 @@
-#include "handle_task.h"
+#include "handle_2_task.h"
 #include "includes.h"
 #include <stdlib.h>   
 #include <math.h>     
@@ -6,18 +6,18 @@
 #define HANDLE_PRINTF(format, ...)     //Debug_Printf("【HANDLE_TASK】:"format "\r\n",##__VA_ARGS__)
 
 /* HANDLE_TASK 任务配置 */
-#define HANDLE_PRIO      	CONFIG_HANDLE_PRIO                   		    
-#define HANDLE_STK_SIZE  	CONFIG_HANDLE_STK_SIZE                         
-TaskHandle_t            HANDLETask_Handler;  							
-void HANDLE_TASK(void *pvParameters);             						
+#define HANDLE_2_PRIO      	CONFIG_HANDLE_2_PRIO                   		    
+#define HANDLE_2_STK_SIZE  	CONFIG_HANDLE_2_STK_SIZE                         
+TaskHandle_t            HANDLE_2Task_Handler;  							
+void HANDLE_2_TASK(void *pvParameters);             						
 
 /************************* 手柄接口2硬件资源定义 *************************/
 uint8_t handle2_Rxbff[LEN] = "";
 HANDLE	handle = {0,0,0,0};
 
-const char handle_link2[] = {0x48,0x44,0x31,0x0D,0x0A};		//手柄2连接，未选择使用
-const char handle_select2[] = {0x55,0x53,0x31,0x0D,0x0A};	//手柄2连接，并选择使用
-const char pumpuser2[] 	= {0x50,0x55,0x31,0x0D,0x0A};		//手柄2蠕动泵正在使用
+const char handle_link2[] = {0x48,0x44,0x32,0x0D,0x0A};		//手柄2连接，未选择使用
+const char handle_select2[] = {0x55,0x53,0x32,0x0D,0x0A};	//手柄2连接，并选择使用
+const char pumpuser2[] 	= {0x50,0x55,0x32,0x0D,0x0A};		//手柄2蠕动泵正在使用
 
 /************************* 可配置参数宏 *************************/
 #define HANDLE2_SEND_INTERVAL    100     // 常规发送间隔：100ms
@@ -203,20 +203,20 @@ void handle2_link_status(void)
 }
 
 /************************* 任务初始化函数 *************************/
-void handle_task_init(void)
+void handle_2_task_init(void)
 {
 	taskENTER_CRITICAL();           
-    xTaskCreate((TaskFunction_t )HANDLE_TASK,
+    xTaskCreate((TaskFunction_t )HANDLE_2_TASK,
                 (const char*    )"HANDLE_TASK",
-                (uint16_t       )HANDLE_STK_SIZE,
+                (uint16_t       )HANDLE_2_STK_SIZE,
                 (void*          )NULL,
-                (UBaseType_t    )HANDLE_PRIO,
-                (TaskHandle_t*  )&HANDLETask_Handler);
+                (UBaseType_t    )HANDLE_2_PRIO,
+                (TaskHandle_t*  )&HANDLE_2Task_Handler);
     taskEXIT_CRITICAL();            
 }
 
 /************************* 任务主函数 *************************/
-void HANDLE_TASK(void *pvParameters)
+void HANDLE_2_TASK(void *pvParameters)
 {
 	// 任务启动时，仅初始化一次串口
 	HandleUsart_Init(115200);

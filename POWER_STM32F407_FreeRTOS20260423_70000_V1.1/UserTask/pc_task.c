@@ -4,6 +4,7 @@
 #include "./MALLOC/malloc.h"
 #include "./BSP/USART/USART.h"
 #include <string.h>  // 必须包含strlen/strstr头文件
+#include <stdio.h>   // 必须包含sprintf头文件
 /*FreeRTOS*********************************************************************************************/
 #include "FreeRTOS.h"
 #include "task.h"
@@ -11,7 +12,7 @@
 /******************************************************************************************************/
 
 // 调试打印（按需开启）
-#define PC_PRINTF(format, ...)     //Debug_Printf("【PC_TASK】:"format "\r\n",##__VA_ARGS__)
+#define PC_PRINTF(format, ...)    // Debug_Printf("【PC_TASK】:"format "\r\n",##__VA_ARGS__)
 
 /* PC_TASK 任务配置 */
 #define PC_PRIO      	CONFIG_PC_PRIO                    /* 任务优先级 */
@@ -24,33 +25,7 @@ void PC_TASK(void *pvParameters);                        /* 任务函数 */
 
 // 全局业务参数
 uint8_t g_continuous_send_flag = 0;   // 持续发送标记：0-停止 1-持续发送
-uint32_t g_send_interval = 50;       // 持续发送间隔（ms），可按需调整
-
-
-const char handle_link1[] = {0x48,0x44,0x31,0x0D,0x0A};		//手柄1连接，未选择使用
-
-const char handle_select1[] = {0x55,0x53,0x31,0x0D,0x0A};	//手柄1连接，并选择使用
-
-const char pumpuser1[] 	= {0x50,0x55,0x31,0x0D,0x0A};		//手柄1蠕动泵正在使用
-
-uint8_t handle1_Rxbff[LEN] = "";
-
-
-
-/************************* 可配置参数宏 *************************/
-#define HANDLE1_SEND_INTERVAL    100     // 常规发送间隔：100ms
-#define UART_REINIT_INTERVAL     300000  // 串口重初始化间隔：5分钟=5*60*1000ms
-
-/************************* 状态机枚举定义 *************************/
-typedef enum {
-    HANDLE1_IDLE = 0,           // 空闲状态
-    HANDLE1_SEND_PUMP,          // 发送蠕动泵指令
-    HANDLE1_SEND_SELECT,        // 发送手柄选择指令
-    HANDLE1_SEND_LINK,          // 发送常规连接指令
-    HANDLE1_WAIT_RESP,          // 等待设备响应
-    HANDLE1_CHECK_RESP,         // 校验响应数据
-    HANDLE1_UART_REINIT,        // 串口安全重初始化状态
-} Handle1_StateTypeDef;
+uint32_t g_send_interval = 20;       // 持续发送间隔（ms），可按需调整
 
 
 /**
@@ -98,6 +73,28 @@ void send_json_string(char *json_str) {
     vTaskDelay(5);
 }
 
+
+// 修复后的转速线性映射：原始 0~75000 → 显示 0~80000
+// 支持负数输入，自动钳位到0~80000范围
+// 使用64位整数运算，彻底解决溢出问题
+uint32_t speed_map_75000_to_80000(int32_t raw_speed)
+{
+    // 第一步：边界检查，负数直接返回0
+    if(raw_speed < 0) {
+        return 0;
+    }
+    
+    // 第二步：上限检查，超过75000直接返回80000
+    if(raw_speed > 75000) {
+        return 80000;
+    }
+    
+    // 核心修复：先强制转换为64位整数再相乘，彻底避免溢出
+    // 64位整数最大值是9e18，完全足够容纳75000*80000=6e9
+    return (uint32_t)(((uint64_t)raw_speed * 80000ULL) / 75000ULL);
+}
+
+
 /**
  * @brief  构造并发送单次JSON数据（封装复用）
  * @retval 无
@@ -106,6 +103,7 @@ void send_single_json(void)
 {
     char *pc_buff = NULL;
     uint8_t sramx = 0;
+    uint32_t send_speed;
     
     // 申请内存并初始化
     pc_buff = mymalloc(sramx, 128);
@@ -115,12 +113,26 @@ void send_single_json(void)
     }
     memset(pc_buff, 0, 128);
     
-    // 构造JSON（使用DynsySta.speed_num）
-    sprintf(pc_buff, "{\"zhuansu\":%d}", DynsySta.speed_num);
+    // 先计算要发送的转速值
+    if(hmivar.num_flag == 8)
+    {
+        send_speed = speed_map_75000_to_80000(DynsySta.speed_num);
+    }
+    else
+    {
+        // 修复：即使不映射，也做边界检查，避免负数
+        send_speed = (DynsySta.speed_num < 0) ? 0 : (uint32_t)DynsySta.speed_num;
+    }
+    
+    // 核心修复：使用%lu格式符打印uint32_t类型
+    // 绝对不能再用%d！%d只适用于有符号int
+    sprintf(pc_buff, "{\"zhuansu\":%lu}", send_speed);
+    
+    PC_PRINTF("num_flag = %d, 原始转速 = %d, 发送转速 = %lu", 
+              hmivar.num_flag, DynsySta.speed_num, send_speed);
     
     // 发送数据
     send_json_string(pc_buff);
-    PC_PRINTF("发送数据：%s", pc_buff);
     
     // 释放内存（避免泄漏）
     myfree(sramx, pc_buff);
@@ -138,14 +150,16 @@ void parse_uart_data(uint8_t *buf, uint8_t len) {
     char json_buf[256] = {0};
     if(len > 0 && len < sizeof(json_buf)) {
         memcpy(json_buf, buf, len);
+        json_buf[len] = '\0';  // 确保字符串以\0结尾（重要！）
     } else {
+        PC_PRINTF("接收数据长度异常：%d", len);
         return; // 数据过长，直接返回
     }
 
     // 2. 校验是否为目标get指令，触发持续发送
     if(verify_get_cmd(json_buf)) {
         g_continuous_send_flag = 1;  // 置位持续发送标记
-        PC_PRINTF("触发持续发送模式");
+        PC_PRINTF("触发持续发送模式，间隔：%dms", g_send_interval);
     } else {
         // 可扩展：接收其他指令（如停止发送）
         if(SAFE_STRSTR(json_buf, "\"cmd\":\"stop\"") != NULL) {
@@ -155,202 +169,59 @@ void parse_uart_data(uint8_t *buf, uint8_t len) {
     }
 }
 
-
-
-
-/*************************手柄接口1 核心业务函数 *************************/
-void handle1_link_status(void)
-{
-    static Handle1_StateTypeDef state = HANDLE1_IDLE;
-    static uint32_t last_send_tick = 0;    // 上次发送的时间戳
-    static uint32_t last_reinit_tick = 0;  // 上次串口初始化的时间戳
-    static uint8_t  retry_cnt = 0;          // 通讯失败重试计数
-    static uint8_t  uart_reinit_req = 0;    // 串口重初始化请求标志
-    static Handle1_StateTypeDef last_send_state = HANDLE1_SEND_LINK; // 记录上次发送的指令类型
-
-    uint32_t current_tick = xTaskGetTickCount();
-
-    // ===================== 1. 5分钟定时触发串口重初始化请求 =====================
-    if ((current_tick - last_reinit_tick >= UART_REINIT_INTERVAL) && (uart_reinit_req == 0))
-    {
-        uart_reinit_req = 1;  // 标记需要初始化，等待当前通讯周期结束后执行
-        last_reinit_tick = current_tick;
-    }
-
-    // ===================== 2. 200ms定时发送触发（非阻塞） =====================
-    if ((state == HANDLE1_IDLE) && (current_tick - last_send_tick >= HANDLE1_SEND_INTERVAL))
-    {
-        // 有初始化请求，优先进入初始化流程
-        if (uart_reinit_req == 1)
-        {
-            state = HANDLE1_UART_REINIT;
-        }
-        // 无初始化请求，按业务逻辑选择发送的指令
-        else if (footvar.pump_tims_global_power && hmivar.handel == 1)
-        {
-            state = HANDLE1_SEND_PUMP;
-            last_send_state = HANDLE1_SEND_PUMP;
-        }
-        else if (hmivar.handel == 1)
-        {
-            state = HANDLE1_SEND_SELECT;
-            last_send_state = HANDLE1_SEND_SELECT;
-        }
-        else
-        {
-            state = HANDLE1_SEND_LINK;
-            last_send_state = HANDLE1_SEND_LINK;
-        }
-        last_send_tick = current_tick; // 更新发送时间戳
-    }
-
-    // ===================== 3. 状态机核心流程 =====================
-    switch (state)
-    {
-        // --------------------- 串口安全重初始化流程 ---------------------
-        case HANDLE1_UART_REINIT:
-        {
-            // 步骤1：停止DMA发送，避免初始化冲突
-            HAL_UART_DMAStop(&huart3);
-            
-            // 步骤2：清空所有收发缓冲区，重置接收长度
-            memset(handle1_Rxbff, 0, LEN * sizeof(char));
-            PCClearSerialBuffer(PCUsart);
-            PCUsartRxLen = 0;
-
-            // 步骤3：安全执行串口初始化（使用你定义的宏）
-            PCUsart_Init(115200);
-
-            // 步骤4：重置标志位和重试计数
-            uart_reinit_req = 0;
-            retry_cnt = 0;
-
-            // 步骤5：初始化完成，回到空闲状态，下一个200ms周期自动发送
-            state = HANDLE1_IDLE;
-            break;
-        }
-
-        // --------------------- 发送蠕动泵指令 ---------------------
-        case HANDLE1_SEND_PUMP:
-            memset(handle1_Rxbff, 0, LEN * sizeof(char));
-            PCUsart_Transmit(PCUsart, (char *)pumpuser1, sizeof(pumpuser1));
-            state = HANDLE1_WAIT_RESP;
-            break;
-
-        // --------------------- 发送手柄选择指令 ---------------------
-        case HANDLE1_SEND_SELECT:
-            memset(handle1_Rxbff, 0, LEN * sizeof(char));
-            PCUsart_Transmit(PCUsart, (char *)handle_select1, sizeof(handle_select1));
-            state = HANDLE1_WAIT_RESP;
-            break;
-
-        // --------------------- 发送常规连接指令 ---------------------
-        case HANDLE1_SEND_LINK:
-            memset(handle1_Rxbff, 0, LEN * sizeof(char));
-            PCUsart_Transmit(PCUsart, (char *)handle_link1, sizeof(handle_link1));
-            state = HANDLE1_WAIT_RESP;
-            break;
-
-        // --------------------- 等待设备响应 ---------------------
-        case HANDLE1_WAIT_RESP:
-            // 有数据接收，拷贝数据进入校验
-            if (PCUsartRxLen > 0)
-            {
-                PCCopySerialData(PCUsart, (char *)handle1_Rxbff, sizeof(handle1_Rxbff));
-                PCClearSerialBuffer(PCUsart);
-                PCUsartRxLen = 0;
-                state = HANDLE1_CHECK_RESP;
-            }
-            // 无数据，超时进入校验（判定本次通讯失败）
-            else if (current_tick - last_send_tick >= HANDLE1_SEND_INTERVAL / 2)
-            {
-                state = HANDLE1_CHECK_RESP;
-            }
-            break;
-
-        // --------------------- 校验响应数据 ---------------------
-        case HANDLE1_CHECK_RESP:
-        {
-            uint8_t comm_ok = 0;
-
-            // 根据发送的指令类型，匹配对应的响应校验规则
-            if (last_send_state == HANDLE1_SEND_PUMP)
-            {
-                if ((handle1_Rxbff[0] == 0x50) && (handle1_Rxbff[1] == 0x55))
-                    comm_ok = 1;
-            }
-            else if (last_send_state == HANDLE1_SEND_SELECT)
-            {
-                if ((handle1_Rxbff[0] == 0x55) && (handle1_Rxbff[1] == 0x53))
-                    comm_ok = 1;
-            }
-            else // HANDLE1_SEND_LINK
-            {
-                if ((handle1_Rxbff[0] == 0x48) && (handle1_Rxbff[1] == 0x44))
-                    comm_ok = 1;
-            }
-            // 通讯成功处理
-            if (comm_ok)
-            {
-                retry_cnt = 0;
-                handle.Link1 = 1; // 标记通讯正常
-				switch(handle1_Rxbff[2])
-				{
-					case 0x31: handle.Link1_Numb = 1; break;
-					case 0x32: handle.Link1_Numb = 2; break;
-					case 0x33: handle.Link1_Numb = 3; break;
-					default:break;
-				}
-				
-            }
-            // 通讯失败处理
-            else
-            {
-                retry_cnt++;
-                // 连续3次失败，标记离线
-                if (retry_cnt > 2)
-                {
-                    retry_cnt = 0;
-                    handle.Link1 = 0;
-					handle.Link1_Numb = 0;
-                }
-            }
-
-            // 校验完成，回到空闲状态，等待下一个200ms周期
-            state = HANDLE1_IDLE;
-            break;
-        }
-
-        // 异常状态兜底，回到空闲
-        default:
-            state = HANDLE1_IDLE;
-            break;
-    }
-}
-
 /**
- * @brief  PC通讯主任务（FreeRTOS任务）
+ * @brief  PC通讯任务主函数（核心：非阻塞循环发送+实时接收）
  * @param  pvParameters: 任务参数
  * @retval 无
  */
 void PC_TASK(void *pvParameters)
 {
-    // 任务启动时，仅初始化一次串口（使用你定义的宏）
-    PCUsart_Init(115200);
-    PC_PRINTF("PC通讯+手柄1通讯任务启动");
+    uint8_t *recv_buff = NULL;
+    uint8_t sramx = 0;
+    uint8_t times = 0;
+    uint32_t send_ticks = 0;  // 持续发送计时
+    
+    pc_init();  // 初始化串口
+    PC_PRINTF("PC通讯任务启动");
 
     while(1)
     {
-        handle1_link_status();    // 状态机核心循环
-        vTaskDelay(1);   // 1ms系统调度，兼顾实时性和CPU占用
+        // 1. 每5ms处理一次接收数据（实时响应上位机指令）
+        if(times >= 1)
+        {
+            times = 0;
+            // 申请接收缓冲区
+            recv_buff = mymalloc(sramx, 255);
+            if(recv_buff != NULL && PCUsartRxLen > 0)
+            {
+                // 拷贝并解析串口数据
+                PCCopySerialData(PCUsart, (char *)recv_buff, 255);
+                parse_uart_data(recv_buff, PCUsartRxLen);
+                // 清空串口缓冲区
+                PCClearSerialBuffer(PCUsart);
+                PCUsartRxLen = 0;  // 强制清零，避免残留
+            }
+            // 释放接收缓冲区
+            myfree(sramx, recv_buff);
+            recv_buff = NULL;
+        }
+        
+        // 2. 持续发送逻辑（非阻塞，不影响指令接收）
+        if(g_continuous_send_flag == 1)
+        {
+            send_ticks++;
+            // 达到发送间隔则发送一次
+            if(send_ticks >= g_send_interval)
+            {
+                send_single_json();  // 构造并发送数据
+                send_ticks = 0;      // 重置计时
+            }
+        }
+        
+        vTaskDelay(1);  // 1ms延时，兼顾响应速度与CPU占用
+        times++;
     }
 }
-
-
-
-
-
-
 
 /**
  * @brief  PC通讯任务初始化

@@ -2,6 +2,11 @@
 #include "includes.h"
 #include <stdlib.h>   // 用于 abs() 绝对值函数
 #include <math.h>     // 用于 round() 四舍五入函数
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #define FOOT_PRINTF(format, ...)     //Debug_Printf("【FOOT_TASK】:"format "\r\n",##__VA_ARGS__)
 
@@ -15,12 +20,46 @@ TaskHandle_t            FOOTTask_Handler;  							/* 任务句柄 */
 void FOOT_TASK(void *pvParameters);             						/* 任务函数 */
 
 
+#define BUFFER_SIZE 20  // 缓冲区容量
+
+#define CALIBRATION   1200  	// 传感器标定数值
+#define	FALLINGEDGE   30	// 传感器下降沿总幅值
 
 
+uint16_t buffsensval[BUFFER_SIZE] = {0};
+
+
+
+// 一阶低通滤波结构体
+typedef struct {
+    float alpha;    // 滤波系数（0 < alpha <= 1）
+    float last_out; // 上一次输出
+} LPF1D;
+
+// 初始化
+void lpf1DInit(LPF1D *lpf, float alpha, float init_val) {
+    lpf->alpha = alpha;
+    lpf->last_out = init_val;
+}
+
+// 滤波更新（每次采样调用一次）
+float lpf1DUpdate(LPF1D *lpf, float input) {
+    lpf->last_out = lpf->alpha * input + (1 - lpf->alpha) * lpf->last_out;
+    return lpf->last_out;
+}
+
+
+
+//电机速度部分卡尔曼算法
+KalmanFilter1D kf;
+
+
+//压力传感器
+LPF1D lpf;
 
 
 FOOTVAR	footvar = {
-	70000,
+	75000,
 	0,
 	0,
 	0,
@@ -34,7 +73,14 @@ FOOTVAR	footvar = {
 	0,
 	4,
 	0,
+	0,
+	0,
 };
+
+
+
+
+
 
 
 // 卡尔曼一阶滤波器
@@ -129,6 +175,77 @@ void kalmanFilter1DSetR(KalmanFilter1D* kf, double R) {
 
 
 
+/**
+ * @brief 环形缓冲区写入、极值维护及严格下降沿时序判定
+ */
+void shift_and_add_ring(uint16_t buffer[],
+                        uint16_t *current_size,
+                        uint16_t *write_index,  // 环形缓冲区的当前写入物理位置
+                        uint16_t *max_value,
+                        uint16_t *min_value,
+                        uint16_t *max_index,
+                        uint16_t *min_index,
+                        uint16_t new_data) {
+    
+    uint16_t idx = *write_index;
+    bool is_full = (*current_size >= BUFFER_SIZE);
+    bool need_recalc = false;
+
+    // 1. 如果缓冲区已满，检查即将被覆盖的最老数据是否是当前的极值
+    if (is_full) {
+        if (idx == *max_index || idx == *min_index) {
+            need_recalc = true; 
+        }
+    }
+
+    // 2. 将新数据直接覆盖写入，无内存搬移（O(1)）
+    buffer[idx] = new_data;
+
+    // 3. 更新写指针与当前缓冲区大小
+    *write_index = (idx + 1) % BUFFER_SIZE;
+    if (!is_full) {
+        (*current_size)++;
+    }
+
+    // 4. 动态维护最大值、最小值及其物理索引
+    if (*current_size == 1) {
+        // 迎接第一个数据，初始化极值
+        *max_value = new_data;
+        *min_value = new_data;
+        *max_index = idx;
+        *min_index = idx;
+    } 
+    else if (need_recalc) {
+        // 【最坏情况】：原极值被覆盖，全盘重新寻找极值（O(N)）
+        *max_value = buffer[0];
+        *min_value = buffer[0];
+        *max_index = 0;
+        *min_index = 0;
+        for (uint16_t i = 1; i < BUFFER_SIZE; i++) {
+            if (buffer[i] > *max_value) {
+                *max_value = buffer[i];
+                *max_index = i;
+            }
+            if (buffer[i] < *min_value) {
+                *min_value = buffer[i];
+                *min_index = i;
+            }
+        }
+    } 
+    else {
+        // 【常规/未满情况】：老极值未被破坏，用新数据做增量对比（O(1)）
+        if (new_data >= *max_value) {
+            *max_value = new_data;
+            *max_index = idx;
+        }
+        if (new_data <= *min_value) {
+            *min_value = new_data;
+            *min_index = idx;
+        }
+    }
+}
+
+
 
 
 
@@ -137,17 +254,8 @@ static void foot_motorspeed_control(void)
 {
 	uint16_t adcx;
 	float temp;
-	
-	KalmanFilter1D kf;
-    // 初始化滤波器
-    // 初始估计值设为0，初始协方差设为10，过程噪声0.01，测量噪声10
 
-    kalmanFilter1DInitDefault(&kf, 0, 10, 0.01, 10);
-		// 预测步骤
-	kalmanFilter1DPredict(&kf);
-
-
-	if(footvar.footCheckFlag) //是否接入脚踏
+	if(footvar.footCheckFlag && (footvar.pressflag == 0)) //是否接入脚踏并且压力阈值是否达到
 	{
 		switch(hmivar.num_flag)	//屏幕挡位是多少对应脚踏就是多少
 		{
@@ -641,8 +749,7 @@ static void foot_motorspeed_control(void)
 //			case 3: DynsySta.CycleSend = 6;  DynsySta.CycleSRSped = hmivar.DynsySRSpe;     break;	
 //			default:	break;
 //		}
-			
-		
+
 	}
 
 	if(footvar.retur > 0)	//脚踏踩下
@@ -760,9 +867,9 @@ static void foot_motorspeed_control(void)
 	}
 	else	//脚踏完全松开
 	{
-		if(!footvar.foot_flag)	//判断脚踏
+		//if(!footvar.foot_flag)	//判断脚踏
 		{
-			FOOT_PRINTF("关闭电机");
+			//FOOT_PRINTF("关闭电机");
 			footvar.foot_flag = 1;	//脚踏松开标志
 			DynsySta.speed_num = 0;	//转速清零
 			switch(hmivar.Dynsysta) //判断停止转向
@@ -771,6 +878,83 @@ static void foot_motorspeed_control(void)
 				case 2: DynsySta.CycleSend = 5;  DynsySta.CycleReveSped = hmivar.DynsyReveSpe;   break;
 				case 3: DynsySta.CycleSend = 6;  DynsySta.CycleSRSped = hmivar.DynsySRSpe;     break;	
 				default:	break;
+			}
+		}
+	}
+	
+
+	
+	if(footvar.pressensor)	//压力传感正在使用
+	{
+		static uint16_t numb = 0;	//数组缓冲区计数	
+		static uint16_t write_idx = 0; // 新增：环形缓冲区写入索引位置
+		static uint16_t value_max = 0;
+		static uint16_t value_min = 0xFFFF;
+		static uint16_t max_index = 0;
+		static uint16_t min_index = 0;
+
+		if(pairsval.pressvalue2 > CALIBRATION 
+		   && pairsval.pressvalue2 < 4096)  // ★ 加合理范围过滤，滤掉野值
+		{
+			// 更新步骤
+			// 每次采样调用
+			uint16_t filtered = lpf1DUpdate(&lpf, pairsval.pressvalue2);
+			
+			//printf("%d,%d\n",pairsval.pressvalue2,filtered);
+			
+			// 【优化方案调用】传入 write_idx 指针，内部自动执行环形管理
+			shift_and_add_ring(buffsensval, &numb, &write_idx, &value_max, &value_min, &max_index, &min_index, filtered);
+			
+			if(numb >= BUFFER_SIZE)	//数组元素大于缓存长度
+			{		
+				uint16_t diff;
+				
+				// 【时序转换的关键】：将物理下标转换为逻辑时间步（0代表最老，BUFFER_SIZE-1代表最新）
+				uint16_t max_time = (max_index - write_idx + BUFFER_SIZE) % BUFFER_SIZE;
+				uint16_t min_time = (min_index - write_idx + BUFFER_SIZE) % BUFFER_SIZE;
+				
+				// 逻辑时间上：最小值发生的时间晚于最大值发生的时间，即为严格的“下降沿”
+				if(min_time > max_time)
+				{
+					diff  = value_max - value_min;
+					
+					if(diff > FALLINGEDGE)		//总高度达到阈值则停止
+					{
+						numb = 0;
+						write_idx = 0;          // 环形写指针同步清零
+						value_max = 0;          // 极值状态重置
+						value_min = 0xFFFF;
+						max_index = 0;
+						min_index = 0;
+						
+						//printf("压力差值 = %d\n",diff);
+						
+						//压力值达到上传上位机电机停止指令
+						diff = 0;
+						// 注意：因为是环形数组且重置了计数，这里用 sizeof 确保安全清除
+						memset(buffsensval, 0, sizeof(uint16_t) * BUFFER_SIZE);		
+						footvar.pressflag = 1; //压力值达到停止电机
+						DynsySta.StaRece = PRESSURE;
+					}
+				}
+				else 
+				{
+					diff = 0;		//非下降沿趋势，总距离清零
+				}						
+			}
+		}	
+		if(footvar.pressflag == 1)
+		{
+			adcx = adc_get_result_average(ADC_ADCX_CHY, 10);    /* 获取通道5的转换值，10次取平均 */
+			temp = (float)adcx * (volthres_js / 4096);                  /* 获取计算后的带小数的实际电压值，比如3.1111 */
+			
+			// 更新步骤
+			double filtered = kalmanFilter1DUpdate(&kf, temp);
+			float result = round(temp * 100) / 100.0f;		//保留两位小数
+			
+			if(result < 1.0)
+			{
+				footvar.pressflag = 0;
 			}
 		}
 	}
@@ -949,6 +1133,18 @@ void FOOT_TASK(void *pvParameters)
 	adc_init();
 	Tim2_Init(1000-1,84-1);				//定时查看按键1触发 ，定时1ms
 	Tim4_Init(1000-1,84-1);				//定时查看按键2触发 ，定时1ms
+	
+	
+	// 初始化：alpha=0.8，初始值1450
+	lpf1DInit(&lpf, 0.4f, 1450.0f);
+
+    // 初始化滤波器
+    // 初始估计值设为0，初始协方差设为10，过程噪声0.01，测量噪声10
+
+    kalmanFilter1DInitDefault(&kf, 0, 10, 0.01, 10);
+		// 预测步骤
+	kalmanFilter1DPredict(&kf);
+	
     while(1)
     {
 		foot_check(); //检测脚踏

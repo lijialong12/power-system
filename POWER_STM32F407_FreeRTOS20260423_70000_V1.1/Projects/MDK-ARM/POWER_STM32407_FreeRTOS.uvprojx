@@ -438,9 +438,14 @@
               <FilePath>..\..\UserTask\foot_task.c</FilePath>
             </File>
             <File>
-              <FileName>handle_task.c</FileName>
+              <FileName>handle_1_task.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\UserTask\handle_task.c</FilePath>
+              <FilePath>..\..\UserTask\handle_1_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>handle_2_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\UserTask\handle_2_task.c</FilePath>
             </File>
             <File>
               <FileName>pc_task.c</FileName>

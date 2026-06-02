@@ -2,7 +2,7 @@
 #define __PC_TASK_H
 
 #include "./SYSTEM/sys/sys.h"
-#include "includes.h"
+
 
 
 
@@ -18,13 +18,13 @@
 
 
 //PCÍ¨Ñ¶´®¿Ú
-#define		PCUsart						3
+#define		PCUsart						1
 #define     PCUsart_Transmit			Usart_Transmit
-#define     PCUsartRxLen   				UsartRxLen3	
+#define     PCUsartRxLen   				UsartRxLen1	
 #define     PCCopySerialData   			CopySerialData	
 #define     PCClearSerialBuffer   		ClearSerialBuffer
-#define     PCUsartTxflag				UsartTxflag3
-#define		PCUsart_Init				Usart3_Dma1_Init
+#define     PCUsartTxflag				UsartTxflag1
+#define		PCUsart_Init				Usart1_Dma2_Init
 
 
 typedef struct{

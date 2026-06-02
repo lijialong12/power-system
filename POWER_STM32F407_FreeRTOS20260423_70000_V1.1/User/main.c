@@ -123,7 +123,8 @@ void start_task(void *pvParameters)
 	pump_task_init();
 	foot_task_init();
 	led_task_init();
-	handle_task_init();
+	handle_1_task_init();
+	handle_2_task_init();
 	pc_task_init();
 	iwdg_init(IWDG_PRESCALER_64,2000);
 	while(1)

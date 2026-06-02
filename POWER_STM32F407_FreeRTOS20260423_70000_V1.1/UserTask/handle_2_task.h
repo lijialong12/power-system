@@ -1,5 +1,5 @@
-#ifndef __HANDLE_TASK_H
-#define __HANDLE_TASK_H
+#ifndef __HANDLE_2_TASK_H
+#define __HANDLE_2_TASK_H
 
 #include "./SYSTEM/sys/sys.h"
 
@@ -39,7 +39,7 @@ uint8_t  	Link2_Numb;			//0 手柄2接口没有手柄  手柄2接口手柄1  手柄2接口手柄2
 extern HANDLE	handle;
 
 
-void handle_task_init(void);
+void handle_2_task_init(void);
 
 #endif
 

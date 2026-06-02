@@ -42,7 +42,8 @@
 #include "foot_task.h"
 #include "./BSP/EXTI/exti.h"
 #include "./BSP/TIM_PWM_DMA/TIM1_CH3_DMA2_6_PWM.h"
-#include "handle_task.h"
+#include "handle_1_task.h"
+#include "handle_2_task.h"
 #include "pc_task.h"
 #endif
 

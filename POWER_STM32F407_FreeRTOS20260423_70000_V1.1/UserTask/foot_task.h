@@ -9,9 +9,9 @@
 #define 	Debug_Printf(...)       printf(__VA_ARGS__)
 
 
-#define		volthres 	1.0
+#define		volthres 	1.0		//这个霍尔值一直在改变 0.75  
 
-#define		volthres_max 	1.75
+#define		volthres_max 		1.70	//这个霍尔值也是一直在改变1.2
 
 #define		volthres_js 	3.3
 
@@ -138,7 +138,9 @@ uint8_t 	pumpGearChangeflag;		//蠕动泵挡位状态
 uint8_t 	pumpautomaticflag;		//自动改变状态
 uint8_t 	pump_tims_global;			//全局蠕动泵默认4档
 uint8_t 	pump_tims_global_power;		//全局蠕动泵开关
-
+uint8_t 	pressensor;		//是否使用压力传感，默认未使用，全局变量
+uint8_t 	pressflag;		//达到压力阈值，停止电机,默认没有达到，全局变量
+	
 
 }FOOTVAR;
 

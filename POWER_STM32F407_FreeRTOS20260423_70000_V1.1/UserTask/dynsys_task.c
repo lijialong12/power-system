@@ -30,10 +30,7 @@
 
 
 #define DYNSYS_PRINTF(format, ...)     //Debug_Printf("【DYNSYS_TASK】:"format "\r\n",##__VA_ARGS__)
-#define BUFFER_SIZE 40  // 缓冲区容量
 
-#define CALIBRATION   0  	// 传感器标定数值
-#define	FALLINGEDGE   1.5	// 传感器下降沿总幅值
 
 /* DYNSYS_TASK 任务 配置
  * 包括: 任务句柄 任务优先级 堆栈大小 创建任务
@@ -43,7 +40,7 @@
 TaskHandle_t            	DYNSYSTask_Handler;  							/* 任务句柄 */
 void DYNSYS_TASK(void *pvParameters);             						/* 任务函数 */
 
-float sensor_value = 0;
+
 
 //uint8_t pc_Txbff[8] = {0x00,0x01,0x05,0x12,0x00,0x01,0xF5,0x49};
 
@@ -539,7 +536,7 @@ void DynsysUpdate(void)
 													}
 													else
 													{
-														abc++;
+														if(footvar.retur)abc++;
 														DynsyTim_Stop();
 
 														if(abc > MOTOR_COCK_TIME_MS)
@@ -654,88 +651,6 @@ void DynsysUpdate(void)
 
 
  
-// 移动缓冲区数据并添加新元素（新增极值索引参数，最大值和最小值指针参数）
-void shift_and_add(float buffer[], 
-                   uint8_t *current_size,
-                   float *max_value, 
-                   float *min_value,
-                   uint8_t *max_index, 
-                   uint8_t *min_index,
-                   float new_data) {
-    // 检查是否需要扩容
-    if (*current_size >= BUFFER_SIZE) {
-        float removed_element = buffer[0];
-        
-        // 整体前移
-        for (int i = 0; i < *current_size; i++) {
-            buffer[i] = buffer[i + 1];
-        }
-        
-        // 末尾添加新数据
-        buffer[*current_size] = new_data;
-        
-        // 极值更新逻辑
-        if (*current_size > 0) {
-            bool need_recalc = false;
-            
-            // 检查被移除元素是否是当前极值
-            if (removed_element == *max_value || 
-                removed_element == *min_value) {
-                need_recalc = true;
-            }
-            
-            if (need_recalc) {
-                // 重新计算整个数组的极值及其索引
-                *max_value = buffer[0];
-                *min_value = buffer[0];
-                *max_index = 0;
-                *min_index = 0;
-                
-                for (int i = 1; i <= *current_size; i++) {
-                    if (buffer[i] > *max_value) {
-                        *max_value = buffer[i];
-                        *max_index = i;
-                    }
-                    if (buffer[i] < *min_value) {
-                        *min_value = buffer[i];
-                        *min_index = i;
-                    }
-                }
-            } else {
-                // 只需比较新元素与当前极值
-                if (new_data > *max_value) {
-                    *max_value = new_data;
-                    *max_index = *current_size;  // 新元素位于末尾
-                }
-                if (new_data < *min_value) {
-                    *min_value = new_data;
-                    *min_index = *current_size;
-                }
-            }
-        }
-    } else {
-        // 缓冲区未满时直接添加
-        buffer[*current_size] = new_data;
-        
-        // 初始化或更新极值及其索引
-        if (*current_size == 0) {
-            *max_value = new_data;
-            *min_value = new_data;
-            *max_index = 0;
-            *min_index = 0;
-        } else {
-            if (new_data > *max_value) {
-                *max_value = new_data;
-                *max_index = *current_size;  // 新元素索引
-            }
-            if (new_data < *min_value) {
-                *min_value = new_data;
-                *min_index = *current_size;
-            }
-        }
-        (*current_size)++;
-    }
-}
 
 
 
@@ -839,6 +754,7 @@ void DYNSYS_TASK(void *pvParameters)
 	static uint16_t	DynsysTIM = 0;
 	static uint8_t num = 3;
 	static uint8_t	CycleTIM = 0;
+	static uint8_t	Presssta = 0;
 	
 //	float buff[BUFFER_SIZE] = {0};
 	vTaskDelay(1500);						//等待板子启动
@@ -858,113 +774,64 @@ void DYNSYS_TASK(void *pvParameters)
 	
 	DynsyTim_Init();
 	
-	/*
-	RS485SENSOR_Usart_Init(115200);                       //初始化RS485 压力传感器数据 
-	vTaskDelay(200);                                               //延时10ticks 
-	DynsyUsart_Transmit(RS485SENSOR_Usart,RS485SENSOR_init,sizeof(RS485SENSOR_init));
-	*/
 	
     while(1)
     {
-				DynsysTIM++;
-				CycleTIM++;
-				
-				if(DynsysTIM > DynsySta.DynsysTime)
-				{
-					DynsysTIM = 0;
-					switch(DynsySta.CycleSend)
-					{ 
-						case 1:{MotorRotatesForward(DynsySta.CycleStraSped,1,1);break; }
-						case 2:{MotorRotatesBack(DynsySta.CycleReveSped,1,2);break;}
-						case 3:{MotorRotatesFoBa(DynsySta.CycleSRSped,1,3);break;}
-						case 4:{MotorRotatesForward(DynsySta.CycleStraSped,0,0);break;}
-						case 5:{MotorRotatesBack(DynsySta.CycleReveSped,0,0);break;}
-						case 6:{MotorRotatesFoBa(DynsySta.CycleSRSped,0,0);break;}
-						default:break;
-					}
-					
-				}
-				if(CycleTIM > DynsySta.CycleTime)					//10ms循环一次
-				{  
-					CycleTIM = 0;	
-					DynsysUpdate();		//接收查询
-				}
-		/*
-				if(RS485SENSOR_UsartRxLen)	//压力传感器数据接收数量
-				{
-					static uint8_t numb = 0;	//数组缓冲区计数	
-					float value_max;
-					float value_min;
-					uint8_t max_index;
-					uint8_t min_index;
-					RS485SENSOR_CopySerialData(RS485SENSOR_Usart,RS485SENSORRxbff,sizeof(RS485SENSORRxbff));
-					bool success =  str_to_float((char *)RS485SENSORRxbff, &sensor_value);  	//字符串数据转浮点数
-					
-					if (success)
-					{
-						//DYNSYS_PRINTF(" 压力差值 = %.1f",sensor_value);
-						if(sensor_value > CALIBRATION)	//滤除错误数据
-						{
-							shift_and_add(buff,&numb,&value_max,&value_min,&max_index,&min_index,sensor_value);	//赋值给缓冲区数组
-							if(numb >= BUFFER_SIZE)	//数组元素大于缓存长度
-							{		
-									float diff;
-									if(min_index > max_index)
-									{
-											diff  = value_max-value_min;
-										
-											if(diff > FALLINGEDGE)		//总高度达到15则停止
-											{
-												numb = 0;
-												static uint8_t  adc = 0;
-												//DYNSYS_PRINTF("停止！！ 压力差值 = %f",diff);
-												if(adc == 0)
-												{
-													adc = 1;
-
-												}
-												else
-												{
-
-												}
-												//RS485PC_Usart_Transmit(RS485PC_Usart,(char *)pc_Txbff,8);		//压力值达到上传上位机电机停止指令
-												diff = 0;
-												memset(buff, 0, BUFFER_SIZE);		//先清空一下缓冲区
-												DynsySta.CycleSend = 4;
-												
-												switch(DynsySta.CycleSend)
-												{ 
-													case 1:{MotorRotatesForward(DynsySta.CycleStraSped,1,1);break; }
-													case 2:{MotorRotatesBack(DynsySta.CycleReveSped,1,2);break;}
-													case 3:{MotorRotatesFoBa(DynsySta.CycleSRSped,1,3);break;}
-													case 4:{MotorRotatesForward(DynsySta.CycleStraSped,0,0);break;}
-													case 5:{MotorRotatesBack(DynsySta.CycleReveSped,0,0);break;}
-													case 6:{MotorRotatesFoBa(DynsySta.CycleSRSped,0,0);break;}
-													default:break;
-												}
-												DynsySta.StaRece = PRESSURE;
-												
-											}
-										
-									}
-									else 
-									{
-										diff = 0;		//总距离清零
-									}						
-							}
-							
-						}			
-						
-					} else {
-								//printf("转换失败\n");
-							}
-					
-					memset(RS485SENSORRxbff, 0, RS485SENSOR_UsartRxLen);		//先清空一下缓冲区
-					DynsyClearSerialBuffer(RS485SENSOR_Usart);
-
-				}	
-		*/	
-
+		DynsysTIM++;
+		CycleTIM++;
+		
+		if(DynsysTIM > DynsySta.DynsysTime)
+		{
+			DynsysTIM = 0;
+			switch(DynsySta.CycleSend)
+			{ 
+				case 1:{MotorRotatesForward(DynsySta.CycleStraSped,1,1);break; }
+				case 2:{MotorRotatesBack(DynsySta.CycleReveSped,1,2);break;}
+				case 3:{MotorRotatesFoBa(DynsySta.CycleSRSped,1,3);break;}
+				case 4:{MotorRotatesForward(DynsySta.CycleStraSped,0,0);break;}
+				case 5:{MotorRotatesBack(DynsySta.CycleReveSped,0,0);break;}
+				case 6:{MotorRotatesFoBa(DynsySta.CycleSRSped,0,0);break;}
+				default:break;
+			}
+			
+		}
+		if(CycleTIM > DynsySta.CycleTime)					//10ms循环一次
+		{  
+			CycleTIM = 0;	
+			DynsysUpdate();		//接收查询
+		}
+		
+		if(footvar.pressflag && (Presssta == 0))//检测到压力值停止电机
+		{
+			Presssta = 1;
+			
+			switch(DynsySta.CycleSend)
+			{ 
+				case 1:{DynsySta.CycleSend = 4;break; }
+				case 2:{DynsySta.CycleSend = 5;break;}
+				case 3:{DynsySta.CycleSend = 6;break;}
+				case 4:break;
+				case 5:break;
+				case 6:break;
+				default:break;
+			}
+			
+			switch(DynsySta.CycleSend)
+			{ 
+				case 1:{MotorRotatesForward(DynsySta.CycleStraSped,1,1);break; }
+				case 2:{MotorRotatesBack(DynsySta.CycleReveSped,1,2);break;}
+				case 3:{MotorRotatesFoBa(DynsySta.CycleSRSped,1,3);break;}
+				case 4:{MotorRotatesForward(DynsySta.CycleStraSped,0,0);break;}
+				case 5:{MotorRotatesBack(DynsySta.CycleReveSped,0,0);break;}
+				case 6:{MotorRotatesFoBa(DynsySta.CycleSRSped,0,0);break;}
+				default:break;
+			}
+			
+		}
+		else if(footvar.pressflag == 0)
+		{
+			Presssta = 0;
+		}
         vTaskDelay(1);                                               /* 延时10ticks */
     }
 }
