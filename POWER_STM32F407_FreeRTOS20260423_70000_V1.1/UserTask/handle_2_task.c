@@ -3,7 +3,7 @@
 #include <stdlib.h>   
 #include <math.h>     
 
-#define HANDLE_PRINTF(format, ...)     //Debug_Printf("【HANDLE_TASK】:"format "\r\n",##__VA_ARGS__)
+#define HANDLE_PRINTF(format, ...)    // Debug_Printf("【HANDLE_TASK】:"format "\r\n",##__VA_ARGS__)
 
 /* HANDLE_TASK 任务配置 */
 #define HANDLE_2_PRIO      	CONFIG_HANDLE_2_PRIO                   		    
@@ -15,13 +15,22 @@ void HANDLE_2_TASK(void *pvParameters);
 uint8_t handle2_Rxbff[LEN] = "";
 HANDLE	handle = {0,0,0,0};
 
-const char handle_link2[] = {0x48,0x44,0x32,0x0D,0x0A};		//手柄2连接，未选择使用
-const char handle_select2[] = {0x55,0x53,0x32,0x0D,0x0A};	//手柄2连接，并选择使用
-const char pumpuser2[] 	= {0x50,0x55,0x32,0x0D,0x0A};		//手柄2蠕动泵正在使用
+//const char handle_link2[] = {0x48,0x44,0x32,0x0D,0x0A};		//手柄2连接，未选择使用
+//const char handle_select2[] = {0x55,0x53,0x32,0x0D,0x0A};	//手柄2连接，并选择使用
+//const char pumpuser2[] 	= {0x50,0x55,0x32,0x0D,0x0A};		//手柄2蠕动泵正在使用
+
+const char handle_link2[] = {0x67,0x65,0x74,0x68,0x0D,0x0A};		//手柄1连接，未选择使用	geth
+const char handle_select2[] = {0x67,0x65,0x74,0x75,0x0D,0x0A};	//手柄1连接，并选择使用 getu
+const char pumpuser2[] 	= {0x67,0x65,0x74,0x70,0x0D,0x0A};		//手柄1蠕动泵正在使用	getp
 
 /************************* 可配置参数宏 *************************/
-#define HANDLE2_SEND_INTERVAL    100     // 常规发送间隔：100ms
+#define HANDLE2_SEND_INTERVAL    20     // 常规发送间隔：100ms
 #define UART5_REINIT_INTERVAL      300000  // 串口重初始化间隔：5分钟=5*60*1000ms
+
+
+
+
+
 
 /************************* 状态机枚举定义 *************************/
 typedef enum {
@@ -33,6 +42,41 @@ typedef enum {
     HANDLE2_CHECK_RESP,         // 校验响应数据
     HANDLE2_UART_REINIT,        // 串口安全重初始化状态
 } Handle2_StateTypeDef;
+
+
+
+
+// 解析函数整体替换
+static int ath_parse_frame(const char *ascii_frame, AthPair *out_pair)
+{
+    // 1. 参数合法性检查
+    if (!ascii_frame || !out_pair) {
+        return -1;
+    }
+
+    // 2. 跳过帧头 "AT?" 4个字符，指向数据部分
+    const char *payload = ascii_frame + 4;
+
+    // 3. 去除帧尾 \r \n
+    size_t len = strlen(payload);
+    while (len > 0 && (payload[len - 1] == '\n' || payload[len - 1] == '\r')) {
+        ((char *)payload)[--len] = '\0';
+    }
+
+    // 4. 解析 "数字1,数字2"
+    int a, b;
+    if (sscanf(payload, "%d,%d", &a, &b) != 2) {
+        return -3;
+    }
+
+    // 5. 直接写入静态结构体，不再 malloc
+    out_pair->gyrosvalue1 = a;
+    out_pair->pressvalue2 = b;
+
+    return 0;
+}
+
+
 
 /*************************手柄接口2 核心业务函数 *************************/
 void handle2_link_status(void)
@@ -148,43 +192,67 @@ void handle2_link_status(void)
         case HANDLE2_CHECK_RESP:
         {
             uint8_t comm_ok = 0;
+			if ((handle2_Rxbff[0] == 'A') && (handle2_Rxbff[1] == 'T'))
+			{
+				// 根据发送的指令类型，匹配对应的响应校验规则
+				if (last_send_state == HANDLE2_SEND_PUMP)
+				{
+					if (handle2_Rxbff[2] == 'P')
+						comm_ok = 1;
+					int ret = ath_parse_frame((char *)handle2_Rxbff, &pairsval);
 
-            // 根据发送的指令类型，匹配对应的响应校验规则
-            if (last_send_state == HANDLE2_SEND_PUMP)
-            {
-                if ((handle2_Rxbff[0] == 0x50) && (handle2_Rxbff[1] == 0x55))
-                    comm_ok = 1;
-            }
-            else if (last_send_state == HANDLE2_SEND_SELECT)
-            {
-                if ((handle2_Rxbff[0] == 0x55) && (handle2_Rxbff[1] == 0x53))
-                    comm_ok = 1;
-            }
-            else // HANDLE2_SEND_LINK
-            {
-                if ((handle2_Rxbff[0] == 0x48) && (handle2_Rxbff[1] == 0x44))
-                    comm_ok = 1;
-            }
+					if (ret == 0) {
+							//printf(" %d, %d\n", pairsval.gyrosvalue1, pairsval.pressvalue2);
+					} else {
+						//printf("解析失败，错误码: %d\n", ret);
+					}
+				}
+				else if (last_send_state == HANDLE2_SEND_SELECT)
+				{
+					if (handle2_Rxbff[2] == 'U')
+						comm_ok = 1;
+					int ret = ath_parse_frame((char *)handle2_Rxbff, &pairsval);
+					if (ret == 0) {
+							//printf(" %d, %d\n", pairsval.gyrosvalue1, pairsval.pressvalue2);
+					} else {
+						//printf("解析失败，错误码: %d\n", ret);
+					}
+				}
+				else // HANDLE1_SEND_LINK
+				{
+					if (handle2_Rxbff[2] == 'H')
+						comm_ok = 1;	
+					int ret = ath_parse_frame((char *)handle2_Rxbff, &pairsval);
+					if (ret == 0) {
+					
+					//printf(" %d, %d\n", pairsval.gyrosvalue1, pairsval.pressvalue2);
+					} else {
+						//printf("解析失败，错误码: %d\n", ret);
+					}
+				}
+			}
             // 通讯成功处理
             if (comm_ok)
             {
                 retry_cnt = 0;
                 handle.Link2 = 1; // 标记通讯正常
-				switch(handle2_Rxbff[2])
+				//HANDLE_PRINTF("解析成功2: %d\n", handle2_Rxbff[3]);
+				switch(handle2_Rxbff[3])
 				{
 					case 0x31: handle.Link2_Numb = 1; break;
 					case 0x32: handle.Link2_Numb = 2; break;
 					case 0x33: handle.Link2_Numb = 3; break;
-					default:break;
+					default:handle.Link2_Numb = 0;break;
 				}
             }
             // 通讯失败处理
             else
             {
                 retry_cnt++;
-                // 连续3次失败，标记离线
-                if (retry_cnt > 2)
+                // 连续50次失败，标记离线
+                if (retry_cnt > 50)
                 {
+					HANDLE_PRINTF("解析失败失败失败2: %d\n", handle2_Rxbff[3]);
                     retry_cnt = 0;
                     handle.Link2 = 0;
 					handle.Link2_Numb = 0; 

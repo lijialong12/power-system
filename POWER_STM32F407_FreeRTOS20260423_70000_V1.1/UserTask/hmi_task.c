@@ -31,7 +31,7 @@
 
 
 //调试口开关
-#define HMI_PRINTF(format, ...)     //Debug_Printf("【HMI_TASK】:"format "\r\n",##__VA_ARGS__)
+#define HMI_PRINTF(format, ...)     Debug_Printf("【HMI_TASK】:"format "\r\n",##__VA_ARGS__)
 
 
 
@@ -48,7 +48,7 @@ volatile uint8_t timer_busy = 0;  // 0=空闲 1=电源占用 2=挡位占用
 
 HMIVAR	hmivar = {1,70000,70000,3500,4,0,1,0,0};
 
-
+static uint8_t interfaceflag = 0;		//接口状态，为了实现切换接口
 
 /* HMI_TASK 任务 配置
  * 包括: 任务句柄 任务优先级 堆栈大小 创建任务
@@ -142,8 +142,9 @@ const unsigned char Sinterslider_left2[] = {0xEE,0xB1,0x23,0x00,0x00,0x00,0x1B,0
 const unsigned char Sinterslider_right1[] = {0xEE,0xB1,0x23,0x00,0x00,0x00,0x08,0x00,0xFF,0xFC,0xFF,0xFF};	//右边子界面滑条到第一页界面
 const unsigned char Sinterslider_right2[] = {0xEE,0xB1,0x23,0x00,0x00,0x00,0x08,0x01,0xFF,0xFC,0xFF,0xFF};	//右边子界面滑条到第二页界面
 
-const unsigned char hande2_button[] = {0xEE,0xB1,0x10,0x00,0x02,0x00,0x0B,0x01,0xFF,0xFC,0xFF,0xFF};	//手柄2
-const unsigned char hande1_button[] = {0xEE,0xB1,0x10,0x00,0x02,0x00,0x0B,0x00,0xFF,0xFC,0xFF,0xFF};	//手柄1
+const unsigned char hande2_button[] = {0xEE,0xB1,0x23,0x00,0x02,0x00,0x0C,0x02,0xFF,0xFC,0xFF,0xFF};	//手柄2连接
+const unsigned char hande1_button[] = {0xEE,0xB1,0x23,0x00,0x02,0x00,0x0C,0x01,0xFF,0xFC,0xFF,0xFF};	//手柄1连接 EE B1 23 00 02 00 0C 01 FF FC FF FF 
+const unsigned char hande_button_off[] = {0xEE,0xB1,0x23,0x00,0x02,0x00,0x0C,0x00,0xFF,0xFC,0xFF,0xFF};	//手柄未连接  EE B1 23 00 02 00 0C 00 FF FC FF FF 
 
 const unsigned char fault_clear[] = {0xEE,0xB1,0x23,0x00,0x00,0x00,0x06,0x09,0xFF,0xFC,0xFF,0xFF};	//清除所有故障
 
@@ -754,7 +755,60 @@ void HmiReceiveDate(void)
 				case 0x04:	// 选择手柄2
 							{
 								
-								Handle_selection_settings(2);
+								if(handle.Link1 && handle.Link2)
+								{
+									if(interfaceflag)
+									{
+										interfaceflag = 0;
+										Handle_selection_settings(1);	//切换到一接口
+										switch(handle.Link1_Numb) //判断手柄序号
+										{
+											case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
+													vTaskDelay(5);  
+													footvar.pressensor = 1;		//开启力传感
+													HMI_PRINTF("手柄1");
+													HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
+													vTaskDelay(5);  
+													break;
+											case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
+													vTaskDelay(5);  
+													footvar.pressensor = 0;		//关闭力传感
+													HMI_PRINTF("手柄2");
+													HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
+													vTaskDelay(5); 
+													break;
+											case 3: break;
+											default:break;
+										}
+										
+									}
+									else
+									{
+										interfaceflag = 1;
+										Handle_selection_settings(2);	//切换到二接口
+										switch(handle.Link2_Numb)	//判断手柄序号
+										{
+											case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
+													vTaskDelay(5);  
+													footvar.pressensor = 1;		//开启力传感
+													HMI_PRINTF("手柄1");
+													HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
+													vTaskDelay(5);  				
+													break;
+											case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
+													vTaskDelay(5);  
+													footvar.pressensor = 0;		//关闭力传感
+													HMI_PRINTF("手柄2");
+													HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
+													vTaskDelay(5); 				
+													break;
+											case 3: break;
+											default:break;
+										}
+									}
+								}
+								
+								
 								HmiClearSerialBuffer(HmiUsart);
 								break;
 							}
@@ -762,7 +816,7 @@ void HmiReceiveDate(void)
 				case 0x05:	// 选择手柄1
 							{
 								
-								Handle_selection_settings(1);
+								//Handle_selection_settings(1);
 								HmiClearSerialBuffer(HmiUsart);
 								break;
 								
@@ -1640,7 +1694,7 @@ void HmiPumpSlideProcess(void)
 	if( footvar.pump_powerflag != last_pump_power || footvar.pumpGearChangeflag != last_pump_gear )
 	{
 		// 只要变了，就响一声
-		BEEP_ON;
+	//	BEEP_ON;
 		
 		// 更新记录值
 		last_pump_power = footvar.pump_powerflag;
@@ -1875,18 +1929,18 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 		Handlesta_2 = handle.Link2;
 		if(handle.Link1 && handle.Link2)
 		{
-			HmiUsart_Transmit(HmiUsart,(char *)handejoin3,sizeof(handejoin3)); 
-			vTaskDelay(10);  
+//			HmiUsart_Transmit(HmiUsart,(char *)handejoin3,sizeof(handejoin3)); 
+//			vTaskDelay(5);  
 			switch(handle.Link1_Numb)	
 			{
 				case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
-						vTaskDelay(10); 
+						vTaskDelay(5); 
 						footvar.pressensor = 1;		//开启力传感
 						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
 						vTaskDelay(5);  				
 						break;
 				case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
-						vTaskDelay(10);  
+						vTaskDelay(5);  
 						footvar.pressensor = 0;		//关闭力传感
 						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
 						vTaskDelay(5); 						
@@ -1897,61 +1951,67 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 			
 			
 			HMI_PRINTF("全部亮");   /* 延时1ticks */
+			interfaceflag = 0;
 			Handle_selection_settings(1);
 		}
 		else if((!handle.Link1) && handle.Link2)
 		{
-			HMI_PRINTF("2亮");
-			HmiUsart_Transmit(HmiUsart,(char *)handejoin2,sizeof(handejoin2)); //选择手柄接口2
-			vTaskDelay(5);                                               /* 延时1ticks */	
+			HMI_PRINTF("2亮 %d",handle.Link2);
 			switch(handle.Link2_Numb)	//判断手柄序号
 			{
 				case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
-						vTaskDelay(5);  
+						vTaskDelay(10);  
 						footvar.pressensor = 1;		//开启力传感
+						HMI_PRINTF("手柄1");
 						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
 						vTaskDelay(5);  				
 						break;
 				case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
 						vTaskDelay(5);  
 						footvar.pressensor = 0;		//关闭力传感
+						HMI_PRINTF("手柄2");
 						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
 						vTaskDelay(5); 				
 						break;
 				case 3: break;
 				default:break;
 			}
+			interfaceflag = 1;
 			Handle_selection_settings(2);
 		}
 		else if(handle.Link1 && (!handle.Link2))
 		{
-			HMI_PRINTF("1亮");
-			HmiUsart_Transmit(HmiUsart,(char *)handejoin1,sizeof(handejoin1)); //选择手柄接口1
-			vTaskDelay(5);                                               /* 延时1ticks */
+			HMI_PRINTF("1亮 %d",handle.Link1);
 			switch(handle.Link1_Numb) //判断手柄序号
 			{
 				case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
 						vTaskDelay(5);  
 						footvar.pressensor = 1;		//开启力传感
+						HMI_PRINTF("手柄1");
 						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
 						vTaskDelay(5);  
 						break;
 				case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
 						vTaskDelay(5);  
 						footvar.pressensor = 0;		//关闭力传感
+						HMI_PRINTF("手柄2");
 						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
 						vTaskDelay(5); 
 						break;
 				case 3: break;
 				default:break;
 			}
+			interfaceflag = 0;
 			Handle_selection_settings(1);
 		}
 		else
 		{
 			HMI_PRINTF("全灭");
-			HmiUsart_Transmit(HmiUsart,(char *)handejoinoff,sizeof(handejoinoff)); 
-			vTaskDelay(5);                                               /* 延时1ticks */
+			HmiUsart_Transmit(HmiUsart,(char *)hande_button_off,sizeof(hande_button_off)); //没有手柄连接
+			vTaskDelay(10);  
+			footvar.pressensor = 0;		//开启力传感
+			HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //打开力传感器图标
+			vTaskDelay(5);  
 		}
 	}
 } 
@@ -2439,7 +2499,26 @@ void HMI_TASK(void *pvParameters)
 		vTaskDelay(30);   //等待串口屏处理完成
 	}
 	while(!pumpsta.pumpflag && (--num));
+	
+	Tim3_Init(10000-1,84-1);  	//定时1ms
+	Tim5_Init(10000-1,840-1);	//用于子界面滑动，定时10ms 用于子界面右滑动
+	Tim8_Init(10000-1,1680-1);	//用于子界面滑动，定时10ms 用于子界面左滑动
 
+	/*******先初始化检测一遍**********/
+	HmiReceiveDate();		//接收屏幕数据处理
+	HmiPowerUpdate();		//脚踏电机开关图标
+	HmiGearUpdate();		//脚踏更新挡位图标
+	HmiPatternUpdate();		//脚踏更新模式切换
+	HmiFootCheckUpdate();	//检测脚踏更新脚踏图标
+	HmiPumpCheckUpdate();	//检测蠕动泵更新图标
+	HmiPumpSlideProcess();	//根据脚踏更新蠕动泵图标
+	HmiHandleUpdate();		//手柄状态实时检测
+	HmiErrorUpdate();		//故障代码显示
+	/*******先初始化检测一遍**********/
+
+	DynsyParam_settings();
+	vTaskDelay(1000);                                               /* 延时1ticks 进行任务调度 */
+	
 	num = 3;
 	do
 	{
@@ -2447,13 +2526,10 @@ void HMI_TASK(void *pvParameters)
 		vTaskDelay(30);   //等待串口屏处理完成
 	}
 	while(at24cxx_check() && (--num));
-		
 	
-	Tim3_Init(10000-1,84-1);  	//定时1ms
-	Tim5_Init(10000-1,840-1);	//用于子界面滑动，定时10ms 用于子界面右滑动
-	Tim8_Init(10000-1,1680-1);	//用于子界面滑动，定时10ms 用于子界面左滑动
-	DynsyParam_settings();
-	vTaskDelay(1000);                                               /* 延时1ticks 进行任务调度 */
+	//初始化完成提示音
+	BEEP_ON;	
+
     while(1)
     {
 		

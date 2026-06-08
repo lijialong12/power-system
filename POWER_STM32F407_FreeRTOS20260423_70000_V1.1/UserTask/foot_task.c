@@ -20,10 +20,10 @@ TaskHandle_t            FOOTTask_Handler;  							/* 任务句柄 */
 void FOOT_TASK(void *pvParameters);             						/* 任务函数 */
 
 
-#define BUFFER_SIZE 20  // 缓冲区容量
+#define BUFFER_SIZE 10  // 缓冲区容量
 
 #define CALIBRATION   1200  	// 传感器标定数值
-#define	FALLINGEDGE   30	// 传感器下降沿总幅值
+#define	FALLINGEDGE   50	// 传感器下降沿总幅值
 
 
 uint16_t buffsensval[BUFFER_SIZE] = {0};
@@ -859,7 +859,6 @@ static void foot_motorspeed_control(void)
 								case 3: DynsySta.CycleSRSped = footvar.retur;  DynsySta.CycleSend = 3;  break;	
 								default:	break;
 							}
-	
 							break;
 						}
 				default:	break;
@@ -1003,6 +1002,7 @@ static void foot_motor_control(void)
 					hmivar.num_flag = 1;
 				}
 				FOOT_PRINTF("切换挡位 = %d",hmivar.num_flag);
+				BEEP_ON;
 			}
 		}
 		else if((gerflag) && (BistTimFlag > 2000))
@@ -1018,6 +1018,7 @@ static void foot_motor_control(void)
 			BistTimFlag = 0;
 			gerflag = 0;
 			footvar.EXTI_footFlag = 0;
+			BEEP_ON;
 		}
 	}
 	
@@ -1040,8 +1041,6 @@ static void foot_motor_control(void)
 		}
 		else if((pumpflagsta) && (PumpTimFlag < 1500) && (PumpTimFlag > 20))
 		{
-			
-			
 			if(key_scan(1,1) == 0)
 			{
 				if(!footvar.pump_tims_global_power)
@@ -1051,6 +1050,7 @@ static void foot_motor_control(void)
 					footvar.pump_powerflag = 1;	    //图标置位
 					footvar.pumpautomaticflag = 1;	//置位状态改变
 					FOOT_PRINTF("蠕动泵开");
+					BEEP_ON;
 				}
 				else
 				{
@@ -1059,13 +1059,12 @@ static void foot_motor_control(void)
 					FOOT_PRINTF("蠕动泵关");
 					footvar.pump_powerflag = 2;	//图标置位
 					footvar.pumpautomaticflag = 1;	//置位状态改变
+					BEEP_ON;
 				}
 				Tim4_Stop();
 				PumpTimFlag = 0;
 				pumpflagsta = 0;
 				footvar.EXTI_pumpFlag = 0;
-
-				
 			}
 		}
 		else if((pumpflagsta) && (PumpTimFlag > 2000))
@@ -1083,6 +1082,7 @@ static void foot_motor_control(void)
 			pumpflagsta = 0;
 			footvar.EXTI_pumpFlag = 0;
 			FOOT_PRINTF("蠕动泵切换挡位 = %d",pumpsta.gear);
+			BEEP_ON;
 		}
 	}
 	
@@ -1136,7 +1136,7 @@ void FOOT_TASK(void *pvParameters)
 	
 	
 	// 初始化：alpha=0.8，初始值1450
-	lpf1DInit(&lpf, 0.4f, 1450.0f);
+	lpf1DInit(&lpf, 0.5f, 1450.0f);
 
     // 初始化滤波器
     // 初始估计值设为0，初始协方差设为10，过程噪声0.01，测量噪声10

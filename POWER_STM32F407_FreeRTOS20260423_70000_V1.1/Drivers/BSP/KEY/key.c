@@ -58,6 +58,9 @@ void key_init(void)
 uint8_t key_scan(uint8_t mode, uint8_t gpio)
 {
     static uint8_t key_up = 1;  /* 按键按松开标志 */
+	
+	static	uint8_t tims = 0;
+		
     uint8_t keyval = 0;
 
     if (mode) key_up = 1;       /* 支持连按 */
@@ -68,8 +71,13 @@ uint8_t key_scan(uint8_t mode, uint8_t gpio)
 		{
 			if (key_up && (KEY0 == 0))  /* 按键松开标志为1, 且有任意一个按键按下了 */
 			{
-				vTaskDelay(20);                                           /* 延时1ticks */
-				key_up = 0;
+				tims++;
+				//vTaskDelay(20);                                           /* 延时1ticks */
+				if(tims > 20)
+				{
+					key_up = 0;
+					tims = 0;
+				}
 
 				if (KEY0 == 0)  keyval = KEY0_PRES;
 
@@ -83,9 +91,14 @@ uint8_t key_scan(uint8_t mode, uint8_t gpio)
 		case 1:
 		{
 			if (key_up && (KEY1 == 0))  /* 按键松开标志为1, 且有任意一个按键按下了 */
-			{
-				vTaskDelay(20);                                           /* 延时1ticks */
-				key_up = 0;
+			{		
+				tims++;
+				//vTaskDelay(20);                                           /* 延时1ticks */
+				if(tims > 20)
+				{
+					key_up = 0;
+					tims = 0;
+				}
 
 				if (KEY1 == 0)  keyval = KEY1_PRES;
 
@@ -100,8 +113,13 @@ uint8_t key_scan(uint8_t mode, uint8_t gpio)
 		{
 			if (key_up && (KEY2 == 0))  /* 按键松开标志为1, 且有任意一个按键按下了 */
 			{
-				vTaskDelay(20);                                           /* 延时1ticks */
-				key_up = 0;
+				tims++;
+				//vTaskDelay(20);                                           /* 延时1ticks */
+				if(tims > 20)
+				{
+					key_up = 0;
+					tims = 0;
+				}
 				
 				if (KEY2 == 0)  keyval = KEY2_PRES;
 

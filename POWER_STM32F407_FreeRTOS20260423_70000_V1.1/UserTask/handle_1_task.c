@@ -11,7 +11,7 @@
 /******************************************************************************************************/
 
 // 调试打印（按需开启）
-#define HANDLE_1_PRINTF(format, ...)     //Debug_Printf("【HANDLE_1_TASK】:"format "\r\n",##__VA_ARGS__)
+#define HANDLE_1_PRINTF(format, ...)    // Debug_Printf("【HANDLE_1_TASK】:"format "\r\n",##__VA_ARGS__)
 
 /* PC_TASK 任务配置 */
 #define HANDLE_1_PRIO      	CONFIG_HANDLE_1_PRIO                    /* 任务优先级 */
@@ -55,7 +55,7 @@ AthPair pairsval = {0,0};
 
 
 // 解析函数整体替换
-int ath_parse_frame(const char *ascii_frame, AthPair *out_pair)
+static int ath_parse_frame(const char *ascii_frame, AthPair *out_pair)
 {
     // 1. 参数合法性检查
     if (!ascii_frame || !out_pair) {
@@ -203,10 +203,8 @@ void handle1_link_status(void)
         case HANDLE1_CHECK_RESP:
         {
             uint8_t comm_ok = 0;
-			
 			if ((handle1_Rxbff[0] == 'A') && (handle1_Rxbff[1] == 'T'))
 			{
-
 				// 根据发送的指令类型，匹配对应的响应校验规则
 				if (last_send_state == HANDLE1_SEND_PUMP)
 				{
@@ -237,7 +235,8 @@ void handle1_link_status(void)
 						comm_ok = 1;	
 					int ret = ath_parse_frame((char *)handle1_Rxbff, &pairsval);
 					if (ret == 0) {
-							//printf(" %d, %d\n", pairsval.gyrosvalue1, pairsval.pressvalue2);
+					
+					//printf(" %d, %d\n", pairsval.gyrosvalue1, pairsval.pressvalue2);
 					} else {
 						//printf("解析失败，错误码: %d\n", ret);
 					}
@@ -248,12 +247,13 @@ void handle1_link_status(void)
             {
                 retry_cnt = 0;
                 handle.Link1 = 1; // 标记通讯正常
+				//HANDLE_1_PRINTF("解析成功1: %d\n", handle1_Rxbff[3]);
 				switch(handle1_Rxbff[3])
 				{
 					case 0x31: handle.Link1_Numb = 1; break;
 					case 0x32: handle.Link1_Numb = 2; break;
 					case 0x33: handle.Link1_Numb = 3; break;
-					default:break;
+					default:	handle.Link1_Numb = 0;  break;
 				}
 				
             }
@@ -261,9 +261,11 @@ void handle1_link_status(void)
             else
             {
                 retry_cnt++;
-                // 连续3次失败，标记离线
-                if (retry_cnt > 2)
+                // 连续50次失败，标记离线
+				
+                if (retry_cnt > 50)
                 {
+					HANDLE_1_PRINTF("解析失败失败失败1: %d\n", handle1_Rxbff[3]);
                     retry_cnt = 0;
                     handle.Link1 = 0;
 					handle.Link1_Numb = 0;

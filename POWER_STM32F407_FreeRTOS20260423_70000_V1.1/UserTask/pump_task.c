@@ -99,6 +99,7 @@ uint8_t pump_init(void)
 		else
 		{
 			sta = PUMPSET;//通讯失败
+			pumpsta.pumpflag = 0;	//通讯失败，泵图标失能
 		}	
 		RS485PUMP_ClearSerialBuffer(RS485PUMP_Usart);		
 	}
@@ -557,6 +558,5 @@ void PUMP_TASK(void *pvParameters)
 		DetectionStatus();
 		DumpUpdate();
 		vTaskDelay(1);                                         /* 延时500ticks */
-
     }
 }
