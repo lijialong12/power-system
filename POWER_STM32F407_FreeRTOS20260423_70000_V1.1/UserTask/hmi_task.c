@@ -31,7 +31,7 @@
 
 
 //调试口开关
-#define HMI_PRINTF(format, ...)     Debug_Printf("【HMI_TASK】:"format "\r\n",##__VA_ARGS__)
+#define HMI_PRINTF(format, ...)     //Debug_Printf("【HMI_TASK】:"format "\r\n",##__VA_ARGS__)
 
 
 
@@ -1928,9 +1928,7 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 		Handlesta_1 = handle.Link1;
 		Handlesta_2 = handle.Link2;
 		if(handle.Link1 && handle.Link2)
-		{
-//			HmiUsart_Transmit(HmiUsart,(char *)handejoin3,sizeof(handejoin3)); 
-//			vTaskDelay(5);  
+		{ 
 			switch(handle.Link1_Numb)	
 			{
 				case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
@@ -2008,7 +2006,7 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 		{
 			HMI_PRINTF("全灭");
 			HmiUsart_Transmit(HmiUsart,(char *)hande_button_off,sizeof(hande_button_off)); //没有手柄连接
-			vTaskDelay(10);  
+			vTaskDelay(5);  
 			footvar.pressensor = 0;		//开启力传感
 			HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //打开力传感器图标
 			vTaskDelay(5);  

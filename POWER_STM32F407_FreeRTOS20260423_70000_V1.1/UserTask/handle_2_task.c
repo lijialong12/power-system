@@ -24,7 +24,7 @@ const char handle_select2[] = {0x67,0x65,0x74,0x75,0x0D,0x0A};	//手柄1连接，并选
 const char pumpuser2[] 	= {0x67,0x65,0x74,0x70,0x0D,0x0A};		//手柄1蠕动泵正在使用	getp
 
 /************************* 可配置参数宏 *************************/
-#define HANDLE2_SEND_INTERVAL    20     // 常规发送间隔：100ms
+#define HANDLE2_SEND_INTERVAL    20     // 常规发送间隔：20ms
 #define UART5_REINIT_INTERVAL      300000  // 串口重初始化间隔：5分钟=5*60*1000ms
 
 
@@ -225,7 +225,7 @@ void handle2_link_status(void)
 					int ret = ath_parse_frame((char *)handle2_Rxbff, &pairsval);
 					if (ret == 0) {
 					
-					//printf(" %d, %d\n", pairsval.gyrosvalue1, pairsval.pressvalue2);
+					//printf("2接口 %d, %d\n", pairsval.gyrosvalue1, pairsval.pressvalue2);
 					} else {
 						//printf("解析失败，错误码: %d\n", ret);
 					}
@@ -252,7 +252,7 @@ void handle2_link_status(void)
                 // 连续50次失败，标记离线
                 if (retry_cnt > 50)
                 {
-					HANDLE_PRINTF("解析失败失败失败2: %d\n", handle2_Rxbff[3]);
+					//HANDLE_PRINTF("解析失败失败失败2: %d\n", handle2_Rxbff[3]);
                     retry_cnt = 0;
                     handle.Link2 = 0;
 					handle.Link2_Numb = 0; 

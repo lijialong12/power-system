@@ -167,10 +167,10 @@ void Usart2_Dma1_Init(uint32_t baudrate)
 
   /* DMA interrupt init */
   /* DMA1_Stream5_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 9, 9);
+    HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 5, 5);
     HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
     /* DMA1_Stream6_IRQn interrupt configuration */
-    HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 9, 9);
+    HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 5, 5);
     HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
     
   /* USER CODE END USART2_Init 0 */
@@ -210,10 +210,10 @@ void Usart3_Dma1_Init(uint32_t baudrate)
 
   /* DMA interrupt init */
   /* DMA1_Stream1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 12, 12);
+  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 12, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
   /* DMA1_Stream3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 11, 11);
+  HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 11, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
 	
   huart3.Instance = USART3;
@@ -239,10 +239,10 @@ void Uart4_Dma1_Init(uint32_t baudrate)
   __HAL_RCC_DMA1_CLK_ENABLE();
 	
   /* DMA1_Stream2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 11, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
   /* DMA1_Stream4_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 11, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
 	
 	
@@ -271,11 +271,11 @@ void Uart5_Dma1_Init(uint32_t baudrate)
 
   /* DMA interrupt init */
   /* DMA1_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 7, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 12, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
 
   /* DMA1_Stream7_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream7_IRQn, 6, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream7_IRQn, 11, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream7_IRQn);
 
   huart5.Instance = UART5;
@@ -375,7 +375,7 @@ void Usart6_Dma2_Init(uint32_t BaudRate)
     // 使能USART6的IDLE中断
     __HAL_UART_ENABLE_IT(&huart6, UART_IT_IDLE);
     // 配置USART6中断优先级并使能
-    HAL_NVIC_SetPriority(USART6_IRQn, 9, 9);
+    HAL_NVIC_SetPriority(USART6_IRQn, 9, 0);
     HAL_NVIC_EnableIRQ(USART6_IRQn);
 
     /* -------------------------- 第七步：启动DMA接收 -------------------------- */
@@ -449,7 +449,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
         __HAL_LINKDMA(uartHandle,hdmatx,hdma_usart1_tx);
 
         /* USART1 interrupt Init */
-        HAL_NVIC_SetPriority(USART1_IRQn, 7, 8);
+        HAL_NVIC_SetPriority(USART1_IRQn, 11, 0);
         HAL_NVIC_EnableIRQ(USART1_IRQn);
 
     }
@@ -515,7 +515,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     __HAL_LINKDMA(uartHandle,hdmatx,hdma_usart2_tx);
 
     /* USART2 interrupt Init */
-    HAL_NVIC_SetPriority(USART2_IRQn, 7, 7);
+    HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(USART2_IRQn);
 
     }
@@ -580,7 +580,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     __HAL_LINKDMA(uartHandle,hdmatx,hdma_usart3_tx);
 
     /* USART3 interrupt Init */
-    HAL_NVIC_SetPriority(USART3_IRQn, 7, 6);
+    HAL_NVIC_SetPriority(USART3_IRQn, 7, 0);
     HAL_NVIC_EnableIRQ(USART3_IRQn);
   }
   if(uartHandle->Instance==UART4)
@@ -641,7 +641,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     __HAL_LINKDMA(uartHandle,hdmatx,hdma_uart4_tx);
 
     /* UART4 interrupt Init */
-    HAL_NVIC_SetPriority(UART4_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(UART4_IRQn, 9, 0);
     HAL_NVIC_EnableIRQ(UART4_IRQn);
 
   /* USER CODE END UART4_MspInit 1 */

@@ -34,7 +34,7 @@ uint8_t handle1_Rxbff[LEN] = "";
 
 
 /************************* 可配置参数宏 *************************/
-#define HANDLE1_SEND_INTERVAL    20     // 常规发送间隔：100ms
+#define HANDLE1_SEND_INTERVAL    20     // 常规发送间隔：20ms
 #define UART_REINIT_INTERVAL     300000  // 串口重初始化间隔：5分钟=5*60*1000ms
 
 /************************* 状态机枚举定义 *************************/
@@ -224,7 +224,7 @@ void handle1_link_status(void)
 						comm_ok = 1;
 					int ret = ath_parse_frame((char *)handle1_Rxbff, &pairsval);
 					if (ret == 0) {
-							//printf(" %d, %d\n", pairsval.gyrosvalue1, pairsval.pressvalue2);
+							//printf("1接口 %d, %d\n", pairsval.gyrosvalue1, pairsval.pressvalue2);
 					} else {
 						//printf("解析失败，错误码: %d\n", ret);
 					}
@@ -294,7 +294,7 @@ void HANDLE_1_TASK(void *pvParameters)
     // 任务启动时，仅初始化一次串口（使用你定义的宏）
     HANDLE_1Usart_Init(115200);
     HANDLE_1_PRINTF("手柄1通讯任务启动");
-
+	vTaskDelay(1000);
     while(1)
     {
         handle1_link_status();    // 状态机核心循环

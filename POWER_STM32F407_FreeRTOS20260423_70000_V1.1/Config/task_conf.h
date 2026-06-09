@@ -23,7 +23,7 @@
 #define CONFIG_HMI_PRIO               				16   	//陶晶池人机交互	
 #define CONFIG_HANDLE_1_PRIO                 		6   	//手柄1任务
 #define CONFIG_PC_PRIO                 				5   	//PC任务	
-#define CONFIG_HANDLE_2_PRIO                 		9   	//手柄2任务	
+#define CONFIG_HANDLE_2_PRIO                 		6   	//手柄2任务	
 
 
 
@@ -40,7 +40,7 @@
 #define CONFIG_FOOT_STK_SIZE                 	256
 #define CONFIG_HANDLE_1_STK_SIZE                256
 #define CONFIG_PC_STK_SIZE                 		128
-#define CONFIG_HANDLE_2_STK_SIZE                128
+#define CONFIG_HANDLE_2_STK_SIZE                256
 
 #endif
 

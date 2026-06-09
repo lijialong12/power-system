@@ -25,7 +25,7 @@ void PC_TASK(void *pvParameters);                        /* 任务函数 */
 
 // 全局业务参数
 uint8_t g_continuous_send_flag = 0;   // 持续发送标记：0-停止 1-持续发送
-uint32_t g_send_interval = 20;       // 持续发送间隔（ms），可按需调整
+uint32_t g_send_interval = 50;       // 持续发送间隔（ms），可按需调整
 
 
 /**

@@ -20,11 +20,10 @@ TaskHandle_t            FOOTTask_Handler;  							/* 任务句柄 */
 void FOOT_TASK(void *pvParameters);             						/* 任务函数 */
 
 
-#define BUFFER_SIZE 10  // 缓冲区容量
+#define BUFFER_SIZE 20  // 缓冲区容量
 
 #define CALIBRATION   1200  	// 传感器标定数值
-#define	FALLINGEDGE   50	// 传感器下降沿总幅值
-
+#define	FALLINGEDGE   35	// 传感器下降沿总幅值
 
 uint16_t buffsensval[BUFFER_SIZE] = {0};
 
@@ -245,6 +244,74 @@ void shift_and_add_ring(uint16_t buffer[],
     }
 }
 
+
+
+
+// 移动缓冲区数据并添加新元素（新增极值索引参数，最大值和最小值指针参数）
+void shift_and_add(uint16_t buffer[],
+                   uint16_t *current_size,
+                   uint16_t *max_value,
+                   uint16_t *min_value,
+                   uint16_t *max_index,
+                   uint16_t *min_index,
+                   uint16_t new_data) {
+    if (*current_size >= BUFFER_SIZE) {
+        float removed_element = buffer[0];
+
+        // 前移元素（只移动 BUFFER_SIZE-1 次）
+        for (int i = 0; i < BUFFER_SIZE - 1; i++) {
+            buffer[i] = buffer[i + 1];
+        }
+        // 新数据放入末尾（索引 BUFFER_SIZE-1）
+        buffer[BUFFER_SIZE - 1] = (uint16_t)new_data;
+
+        // 极值更新
+        if (removed_element == *max_value || removed_element == *min_value) {
+            // 重新计算
+            *max_value = buffer[0];
+            *min_value = buffer[0];
+            *max_index = 0;
+            *min_index = 0;
+            for (int i = 1; i < BUFFER_SIZE; i++) {
+                if (buffer[i] > *max_value) {
+                    *max_value = buffer[i];
+                    *max_index = i;
+                }
+                if (buffer[i] < *min_value) {
+                    *min_value = buffer[i];
+                    *min_index = i;
+                }
+            }
+        } else {
+            if (new_data > *max_value) {
+                *max_value = new_data;
+                *max_index = BUFFER_SIZE - 1;
+            }
+            if (new_data < *min_value) {
+                *min_value = new_data;
+                *min_index = BUFFER_SIZE - 1;
+            }
+        }
+    } else {
+        buffer[*current_size] = (uint16_t)new_data;
+        if (*current_size == 0) {
+            *max_value = new_data;
+            *min_value = new_data;
+            *max_index = 0;
+            *min_index = 0;
+        } else {
+            if (new_data > *max_value) {
+                *max_value = new_data;
+                *max_index = *current_size;
+            }
+            if (new_data < *min_value) {
+                *min_value = new_data;
+                *min_index = *current_size;
+            }
+        }
+        (*current_size)++;
+    }
+}
 
 
 
@@ -880,9 +947,7 @@ static void foot_motorspeed_control(void)
 			}
 		}
 	}
-	
 
-	
 	if(footvar.pressensor)	//压力传感正在使用
 	{
 		static uint16_t numb = 0;	//数组缓冲区计数	
@@ -895,50 +960,28 @@ static void foot_motorspeed_control(void)
 		if(pairsval.pressvalue2 > CALIBRATION 
 		   && pairsval.pressvalue2 < 4096)  // ★ 加合理范围过滤，滤掉野值
 		{
-			// 更新步骤
-			// 每次采样调用
-			uint16_t filtered = lpf1DUpdate(&lpf, pairsval.pressvalue2);
-			
-			//printf("%d,%d\n",pairsval.pressvalue2,filtered);
-			
-			// 【优化方案调用】传入 write_idx 指针，内部自动执行环形管理
-			shift_and_add_ring(buffsensval, &numb, &write_idx, &value_max, &value_min, &max_index, &min_index, filtered);
-			
+			//FOOT_PRINTF(" 压力值 = %d",pairsval.pressvalue2);
+			shift_and_add(buffsensval,&numb,&value_max,&value_min,&max_index,&min_index,pairsval.pressvalue2);	//赋值给缓冲区数组
 			if(numb >= BUFFER_SIZE)	//数组元素大于缓存长度
 			{		
 				uint16_t diff;
-				
-				// 【时序转换的关键】：将物理下标转换为逻辑时间步（0代表最老，BUFFER_SIZE-1代表最新）
-				uint16_t max_time = (max_index - write_idx + BUFFER_SIZE) % BUFFER_SIZE;
-				uint16_t min_time = (min_index - write_idx + BUFFER_SIZE) % BUFFER_SIZE;
-				
-				// 逻辑时间上：最小值发生的时间晚于最大值发生的时间，即为严格的“下降沿”
-				if(min_time > max_time)
+				if(min_index > max_index)
 				{
-					diff  = value_max - value_min;
-					
-					if(diff > FALLINGEDGE)		//总高度达到阈值则停止
+					diff  = value_max-value_min;
+					//FOOT_PRINTF("压力差值 = %d\n",diff);
+					if(diff > FALLINGEDGE)		//总高度达到15则停止
 					{
 						numb = 0;
-						write_idx = 0;          // 环形写指针同步清零
-						value_max = 0;          // 极值状态重置
-						value_min = 0xFFFF;
-						max_index = 0;
-						min_index = 0;
-						
-						//printf("压力差值 = %d\n",diff);
-						
-						//压力值达到上传上位机电机停止指令
+						FOOT_PRINTF("停止！！ 压力差值 = %d\n",diff);
 						diff = 0;
-						// 注意：因为是环形数组且重置了计数，这里用 sizeof 确保安全清除
-						memset(buffsensval, 0, sizeof(uint16_t) * BUFFER_SIZE);		
+						memset(buffsensval, 0, BUFFER_SIZE);		//先清空一下缓冲区
 						footvar.pressflag = 1; //压力值达到停止电机
 						DynsySta.StaRece = PRESSURE;
 					}
 				}
 				else 
 				{
-					diff = 0;		//非下降沿趋势，总距离清零
+					diff = 0;		//总距离清零
 				}						
 			}
 		}	
@@ -951,9 +994,13 @@ static void foot_motorspeed_control(void)
 			double filtered = kalmanFilter1DUpdate(&kf, temp);
 			float result = round(temp * 100) / 100.0f;		//保留两位小数
 			
-			if(result < 1.0)
+			if(result < 1.0f)
 			{
 				footvar.pressflag = 0;
+			}
+			else
+			{
+				
 			}
 		}
 	}
@@ -1136,7 +1183,7 @@ void FOOT_TASK(void *pvParameters)
 	
 	
 	// 初始化：alpha=0.8，初始值1450
-	lpf1DInit(&lpf, 0.5f, 1450.0f);
+	lpf1DInit(&lpf, 0.8f, 1450.0f);
 
     // 初始化滤波器
     // 初始估计值设为0，初始协方差设为10，过程噪声0.01，测量噪声10
