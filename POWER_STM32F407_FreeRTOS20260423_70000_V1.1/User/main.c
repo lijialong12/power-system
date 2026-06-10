@@ -91,7 +91,7 @@ int main(void)
     HAL_Init();                         /* 初始化HAL库 */
     sys_stm32_clock_init(336, 8, 2, 7); /* 设置时钟,168Mhz */
     delay_init(168);                    /* 延时初始化 */
-	//Usart1_Dma2_Init(115200);			/*	调试口	*/
+//	Usart1_Dma2_Init(115200);			/*	调试口	*/
 	my_mem_init(SRAMIN);                /* 初始化内部SRAM内存池 */
 	my_mem_init(SRAMCCM);               /* 初始化内部CCM内存池 */
 	led_init(); 

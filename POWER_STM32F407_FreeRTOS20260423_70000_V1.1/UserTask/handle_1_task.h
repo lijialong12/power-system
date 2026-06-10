@@ -29,23 +29,7 @@
 
 
 
-typedef struct{
 
-uint8_t  	Link;			//通讯连接	
-
-
-} HANDE_1DATA;
-
-
-/* 存储一对整数的结构 */
-typedef struct {
-    int gyrosvalue1;
-    int pressvalue2;
-} AthPair;
-
-
-extern AthPair pairsval;
-extern HANDE_1DATA	handle_1data;
 
 
 

@@ -24,9 +24,7 @@ void HANDLE_1_TASK(void *pvParameters);                        /* 任务函数 */
 
 
 const char handle_link1[] = {0x67,0x65,0x74,0x68,0x0D,0x0A};		//手柄1连接，未选择使用	geth
-
 const char handle_select1[] = {0x67,0x65,0x74,0x75,0x0D,0x0A};	//手柄1连接，并选择使用 getu
-
 const char pumpuser1[] 	= {0x67,0x65,0x74,0x70,0x0D,0x0A};		//手柄1蠕动泵正在使用	getp
 
 uint8_t handle1_Rxbff[LEN] = "";
@@ -34,8 +32,7 @@ uint8_t handle1_Rxbff[LEN] = "";
 
 
 /************************* 可配置参数宏 *************************/
-#define HANDLE1_SEND_INTERVAL    20     // 常规发送间隔：20ms
-#define UART_REINIT_INTERVAL     300000  // 串口重初始化间隔：5分钟=5*60*1000ms
+#define UART_REINIT_INTERVAL     300000  	// 串口重初始化间隔：5分钟=5*60*1000ms
 
 /************************* 状态机枚举定义 *************************/
 typedef enum {
@@ -109,7 +106,7 @@ void handle1_link_status(void)
     }
 
     // ===================== 2. 100ms定时发送触发（非阻塞） =====================
-    if ((state == HANDLE1_IDLE) && (current_tick - last_send_tick >= HANDLE1_SEND_INTERVAL))
+    if ((state == HANDLE1_IDLE) && (current_tick - last_send_tick >= handle.hande1_send_interval))
     {
         // 有初始化请求，优先进入初始化流程
         if (uart_reinit_req == 1)
@@ -193,7 +190,7 @@ void handle1_link_status(void)
                 state = HANDLE1_CHECK_RESP;
             }
             // 无数据，超时进入校验（判定本次通讯失败）
-            else if (current_tick - last_send_tick >= HANDLE1_SEND_INTERVAL / 2)
+            else if (current_tick - last_send_tick >= handle.hande1_send_interval / 2)
             {
                 state = HANDLE1_CHECK_RESP;
             }
@@ -263,7 +260,7 @@ void handle1_link_status(void)
                 retry_cnt++;
                 // 连续50次失败，标记离线
 				
-                if (retry_cnt > 50)
+                if (retry_cnt > handle.Rerror1)
                 {
 					HANDLE_1_PRINTF("解析失败失败失败1: %d\n", handle1_Rxbff[3]);
                     retry_cnt = 0;

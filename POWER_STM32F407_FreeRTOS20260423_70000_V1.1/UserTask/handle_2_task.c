@@ -13,19 +13,15 @@ void HANDLE_2_TASK(void *pvParameters);
 
 /************************* 手柄接口2硬件资源定义 *************************/
 uint8_t handle2_Rxbff[LEN] = "";
-HANDLE	handle = {0,0,0,0};
+HANDLE	handle = {0,0,0,0,20,50,100,10};
 
-//const char handle_link2[] = {0x48,0x44,0x32,0x0D,0x0A};		//手柄2连接，未选择使用
-//const char handle_select2[] = {0x55,0x53,0x32,0x0D,0x0A};	//手柄2连接，并选择使用
-//const char pumpuser2[] 	= {0x50,0x55,0x32,0x0D,0x0A};		//手柄2蠕动泵正在使用
 
 const char handle_link2[] = {0x67,0x65,0x74,0x68,0x0D,0x0A};		//手柄1连接，未选择使用	geth
 const char handle_select2[] = {0x67,0x65,0x74,0x75,0x0D,0x0A};	//手柄1连接，并选择使用 getu
 const char pumpuser2[] 	= {0x67,0x65,0x74,0x70,0x0D,0x0A};		//手柄1蠕动泵正在使用	getp
 
-/************************* 可配置参数宏 *************************/
-#define HANDLE2_SEND_INTERVAL    20     // 常规发送间隔：20ms
-#define UART5_REINIT_INTERVAL      300000  // 串口重初始化间隔：5分钟=5*60*1000ms
+/************************* 可配置参数宏 *************************/	
+#define  UART5_REINIT_INTERVAL      300000  // 串口重初始化间隔：5分钟=5*60*1000ms
 
 
 
@@ -98,7 +94,7 @@ void handle2_link_status(void)
     }
 
     // ===================== 2. 100ms定时发送触发（非阻塞） =====================
-    if ((state == HANDLE2_IDLE) && (current_tick - last_send_tick >= HANDLE2_SEND_INTERVAL))
+    if ((state == HANDLE2_IDLE) && (current_tick - last_send_tick >= handle.hande2_send_interval))
     {
         // 有初始化请求，优先进入初始化流程
         if (uart_reinit_req == 1)
@@ -182,7 +178,7 @@ void handle2_link_status(void)
                 state = HANDLE2_CHECK_RESP;
             }
             // 无数据，超时进入校验（判定本次通讯失败）
-            else if (current_tick - last_send_tick >= HANDLE2_SEND_INTERVAL / 2)
+            else if (current_tick - last_send_tick >= handle.hande2_send_interval / 2)
             {
                 state = HANDLE2_CHECK_RESP;
             }
@@ -250,7 +246,7 @@ void handle2_link_status(void)
             {
                 retry_cnt++;
                 // 连续50次失败，标记离线
-                if (retry_cnt > 50)
+                if (retry_cnt > handle.Rerror2)
                 {
 					//HANDLE_PRINTF("解析失败失败失败2: %d\n", handle2_Rxbff[3]);
                     retry_cnt = 0;

@@ -162,6 +162,8 @@ const unsigned char fault_motor7[] = {0xEE,0xB1,0x23,0x00,0x00,0x00,0x06,0x08,0x
 const unsigned char force_sensoff[] = {0xEE,0xB1,0x10,0x00,0x03,0x00,0x06,0x00,0xFF,0xFC,0xFF,0xFF};		//反转按钮弹起
 const unsigned char force_senson[] = {0xEE,0xB1,0x10,0x00,0x03,0x00,0x06,0x01,0xFF,0xFC,0xFF,0xFF};	//反转按钮按下
 
+unsigned char him_display[] = {0xEE,0xB1,0x32,0x00,0x00,0x00,0x0B,0x00,0x00,0x01,0xDD,0xFF,0xFC,0xFF,0xFF};	// 显示压力波形 EE B1 32 00 00 00 0B 00 00 01 DD FF FC FF FF 
+
 //通讯初始化
 uint8_t hmi_init(void)
 {
@@ -447,9 +449,8 @@ void HmiReceiveDate(void)
 {
 	if(HmiUsartRxLen)
 	{
-
 		HmiCopySerialData(HmiUsart,(char *)hmi_Rxbff,sizeof(hmi_Rxbff));
-		
+		vTaskDelay(5);
 		if((hmi_Rxbff[0] == 0x5A) && (hmi_Rxbff[1] == 0x01) && (hmi_Rxbff[3] == 0xA5))
 		{
 			switch(hmi_Rxbff[2])
@@ -765,16 +766,23 @@ void HmiReceiveDate(void)
 										{
 											case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
 													vTaskDelay(5);  
-													footvar.pressensor = 1;		//开启力传感
+													footvar.pressensor = 0;		//关闭力传感
 													HMI_PRINTF("手柄1");
-													HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
+													HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
 													vTaskDelay(5);  
 													break;
 											case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
 													vTaskDelay(5);  
-													footvar.pressensor = 0;		//关闭力传感
+													footvar.pressensor = 1;		//开启力传感
+											
+													//更改手柄通讯速度
+													handle.hande1_send_interval = 20;
+													handle.hande2_send_interval = 100;
+													handle.Rerror1 = 50;
+													handle.Rerror2 = 10;
+											
 													HMI_PRINTF("手柄2");
-													HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
+													HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
 													vTaskDelay(5); 
 													break;
 											case 3: break;
@@ -790,16 +798,22 @@ void HmiReceiveDate(void)
 										{
 											case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
 													vTaskDelay(5);  
-													footvar.pressensor = 1;		//开启力传感
+													footvar.pressensor = 0;		//关闭力传感
 													HMI_PRINTF("手柄1");
-													HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
+													HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
 													vTaskDelay(5);  				
 													break;
 											case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
 													vTaskDelay(5);  
-													footvar.pressensor = 0;		//关闭力传感
+													footvar.pressensor = 1;		//开启力传感
+													//更改手柄通讯速度
+													handle.hande1_send_interval = 100;
+													handle.hande2_send_interval = 20;
+													handle.Rerror1 = 10;
+													handle.Rerror2 = 50;
+											
 													HMI_PRINTF("手柄2");
-													HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
+													HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
 													vTaskDelay(5); 				
 													break;
 											case 3: break;
@@ -1210,6 +1224,7 @@ void HmiFootCheckUpdate(void)
 		fcsta = !fcsta;
 		//更新插入图标
 		HMI_PRINTF("更新脚踏插入图标");
+		vTaskDelay(5);
 		HmiUsart_Transmit(HmiUsart,(char *)foot_on,sizeof(foot_on));
 		vTaskDelay(20);
 	}
@@ -1218,6 +1233,7 @@ void HmiFootCheckUpdate(void)
 		fcsta = !fcsta;
 		//更新未插入图标
 		HMI_PRINTF("更新脚踏未插入图标");
+		vTaskDelay(5);
 		HmiUsart_Transmit(HmiUsart,(char *)foot_off,sizeof(foot_off));
 		vTaskDelay(20);
 	}
@@ -1235,6 +1251,7 @@ void HmiPumpCheckUpdate(void)
 		psta = !psta;
 		//更新连接图标
 		HMI_PRINTF("更新蠕动泵插入图标");
+		vTaskDelay(5);
 		HmiUsart_Transmit(HmiUsart,(char *)pump_on,sizeof(pump_on));
 		vTaskDelay(20);
 	}
@@ -1243,6 +1260,7 @@ void HmiPumpCheckUpdate(void)
 		psta = !psta;
 		//更新未连接图标
 		HMI_PRINTF("更新蠕动泵未插入图标");
+		vTaskDelay(5);
 		HmiUsart_Transmit(HmiUsart,(char *)pump_off,sizeof(pump_off));
 		vTaskDelay(20);
 	}
@@ -1452,6 +1470,7 @@ void HmiPatternUpdate(void)
 {
 	if(footvar.foot_patternflag)
 	{
+		vTaskDelay(5);
 		footvar.foot_patternflag = 0;
 		switch(hmivar.Dynsysta)
 		{
@@ -1718,6 +1737,7 @@ void HmiPumpSlideProcess(void)
 			slide_phase = 2;     			
 			if(!delay_whether)
 			{
+				vTaskDelay(5);
 				SendPumpDriveIcon();
 				vTaskDelay(5);
 				HMI_PRINTF("delay_whether = %d",delay_whether);
@@ -1734,6 +1754,7 @@ void HmiPumpSlideProcess(void)
         case 1: // 等待第一次2秒计时完成
             if (p_timer_3s == 0)       	//开关那边的延时是否完成 
             {
+				vTaskDelay(5);
 				//【仅发送1次】蠕动泵图标 + 右滑界面指令
 				SendPumpDriveIcon();
 				vTaskDelay(5);
@@ -1827,11 +1848,13 @@ void HmiPowerUpdate(void)
 				if(Powersta_flag)
 				{
 					HMI_PRINTF("打开！！！\r\n");
+					vTaskDelay(5);
 					HmiUsart_Transmit(HmiUsart,(char *)power_on,sizeof(power_on));
 				}
 				else
 				{
 					HMI_PRINTF("关闭！！！\r\n");
+					vTaskDelay(5);
 					HmiUsart_Transmit(HmiUsart,(char *)power_off,sizeof(power_off));
 				}
 				vTaskDelay(5);
@@ -1863,11 +1886,13 @@ void HmiPowerUpdate(void)
                 if(Powersta_flag)
                 {
                     HMI_PRINTF("打开！！！\r\n");
+					vTaskDelay(5);
                     HmiUsart_Transmit(HmiUsart,(char *)power_on,sizeof(power_on));
                 }
                 else
                 {
                     HMI_PRINTF("关闭！！！\r\n");
+					vTaskDelay(5);
                     HmiUsart_Transmit(HmiUsart,(char *)power_off,sizeof(power_off));
                 }
                 vTaskDelay(5);
@@ -1890,11 +1915,13 @@ void HmiPowerUpdate(void)
                 {
                     if(Powersta_flag)
                     {
+						vTaskDelay(5);
                         HmiUsart_Transmit(HmiUsart,(char *)power_on,sizeof(power_on));
                         HMI_PRINTF("打开运行\r\n");
                     }
                     else
                     {
+						vTaskDelay(5);
                         HmiUsart_Transmit(HmiUsart,(char *)power_off,sizeof(power_off));
                         HMI_PRINTF("关闭运行\r\n");
                     }
@@ -1924,6 +1951,7 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 	
 	if(Handlesta_1 != handle.Link1 || Handlesta_2 != handle.Link2)
 	{
+		vTaskDelay(5);
 		HMI_PRINTF("手柄检测");
 		Handlesta_1 = handle.Link1;
 		Handlesta_2 = handle.Link2;
@@ -1933,14 +1961,21 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 			{
 				case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
 						vTaskDelay(5); 
-						footvar.pressensor = 1;		//开启力传感
-						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
+						footvar.pressensor = 0;		//关闭力传感
+						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
 						vTaskDelay(5);  				
 						break;
 				case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
 						vTaskDelay(5);  
-						footvar.pressensor = 0;		//关闭力传感
-						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
+						footvar.pressensor = 1;		//开启力传感
+				
+						//更改手柄通讯速度
+						handle.hande1_send_interval = 20;
+						handle.hande2_send_interval = 100;
+						handle.Rerror1 = 50;
+						handle.Rerror2 = 10;
+				
+						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
 						vTaskDelay(5); 						
 						break;
 				case 3: break;
@@ -1959,16 +1994,23 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 			{
 				case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
 						vTaskDelay(10);  
-						footvar.pressensor = 1;		//开启力传感
+						footvar.pressensor = 0;		//关闭力传感
 						HMI_PRINTF("手柄1");
-						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
+						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
 						vTaskDelay(5);  				
 						break;
 				case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
 						vTaskDelay(5);  
-						footvar.pressensor = 0;		//关闭力传感
+						footvar.pressensor = 1;		//开启力传感
+				
+						//更改手柄通讯速度
+						handle.hande1_send_interval = 100;
+						handle.hande2_send_interval = 20;
+						handle.Rerror1 = 10;
+						handle.Rerror2 = 50;
+				
 						HMI_PRINTF("手柄2");
-						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
+						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
 						vTaskDelay(5); 				
 						break;
 				case 3: break;
@@ -1984,17 +2026,25 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 			{
 				case 1: HmiUsart_Transmit(HmiUsart,(char *)hande1_button,sizeof(hande1_button)); //选择手柄1
 						vTaskDelay(5);  
-						footvar.pressensor = 1;		//开启力传感
+						footvar.pressensor = 0;		//关闭力传感
 						HMI_PRINTF("手柄1");
-						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
+						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
 						vTaskDelay(5);  
 						break;
 				case 2: HmiUsart_Transmit(HmiUsart,(char *)hande2_button,sizeof(hande2_button)); //选择手柄2
 						vTaskDelay(5);  
-						footvar.pressensor = 0;		//关闭力传感
+						footvar.pressensor = 1;		//开启力传感
+						
+						//更改手柄通讯速度
+						handle.hande1_send_interval = 20;
+						handle.hande2_send_interval = 100;
+						handle.Rerror1 = 50;
+						handle.Rerror2 = 10;
+				
 						HMI_PRINTF("手柄2");
-						HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //关闭力传感器图标
+						HmiUsart_Transmit(HmiUsart,(char *)force_senson,sizeof(force_senson)); //打开力传感器图标
 						vTaskDelay(5); 
+				
 						break;
 				case 3: break;
 				default:break;
@@ -2007,7 +2057,7 @@ void HmiHandleUpdate(void)		//更新开关图标 ,自动上传
 			HMI_PRINTF("全灭");
 			HmiUsart_Transmit(HmiUsart,(char *)hande_button_off,sizeof(hande_button_off)); //没有手柄连接
 			vTaskDelay(5);  
-			footvar.pressensor = 0;		//开启力传感
+			footvar.pressensor = 0;		//关闭力传感
 			HmiUsart_Transmit(HmiUsart,(char *)force_sensoff,sizeof(force_sensoff)); //打开力传感器图标
 			vTaskDelay(5);  
 		}
@@ -2035,6 +2085,7 @@ void HmiErrorUpdate(void)
 			if(pumpsta.run == 4){pumpsta.run = 0;}
 			if(pumpsta.stop == 4){pumpsta.stop = 0;}
 			Errornumber = 0;
+			vTaskDelay(5);
 			HmiUsart_Transmit(HmiUsart,(char *)fault_pump2,sizeof(fault_pump2));vTaskDelay(5);
 		}
 	}
@@ -2048,6 +2099,7 @@ void HmiErrorUpdate(void)
 			if(pumpsta.run == 3){pumpsta.run = 0;}
 			if(pumpsta.stop == 3){pumpsta.stop = 0;}
 			Errornumber = 0;
+			vTaskDelay(5);
 			HmiUsart_Transmit(HmiUsart,(char *)fault_pump1,sizeof(fault_pump1));vTaskDelay(5);
 		}
 	}
@@ -2064,6 +2116,7 @@ void HmiErrorUpdate(void)
 			HMI_PRINTF("Tim3_Start()");
 			Errornumber = 0;
 			DynsySta.StaRece = 0;
+			vTaskDelay(5);
 			HmiUsart_Transmit(HmiUsart,(char *)fault_motor7,sizeof(fault_motor7));vTaskDelay(5);
 		}
 
@@ -2078,6 +2131,7 @@ void HmiErrorUpdate(void)
 			HMI_PRINTF("Tim3_Start()");
 			Errornumber = 0;
 			DynsySta.StaRece = 0;
+			vTaskDelay(5);
 			HmiUsart_Transmit(HmiUsart,(char *)fault_motor1,sizeof(fault_motor1));vTaskDelay(5);
 		}
 
@@ -2092,6 +2146,7 @@ void HmiErrorUpdate(void)
 			HMI_PRINTF("Tim3_Start()");
 			Errornumber = 0;
 			DynsySta.StaRece = 0;
+			vTaskDelay(5);
 			HmiUsart_Transmit(HmiUsart,(char *)fault_motor2,sizeof(fault_motor2));vTaskDelay(5);
 		}
 	}
@@ -2105,6 +2160,7 @@ void HmiErrorUpdate(void)
 			HMI_PRINTF("Tim3_Start()");
 			Errornumber = 0;
 			DynsySta.StaRece = 0;
+			vTaskDelay(5);
 			HmiUsart_Transmit(HmiUsart,(char *)fault_motor3,sizeof(fault_motor3));vTaskDelay(5);
 		}
 	}
@@ -2117,7 +2173,8 @@ void HmiErrorUpdate(void)
 			HMI_PRINTF("Tim3_Start()");
 			Errornumber = 0;
 			DynsySta.StaRece = 0;
-			HmiUsart_Transmit(HmiUsart,(char *)fault_motor4,sizeof(fault_motor4));vTaskDelay(5);
+			vTaskDelay(5);
+			//HmiUsart_Transmit(HmiUsart,(char *)fault_motor4,sizeof(fault_motor4));vTaskDelay(5);
 		}
 	}
 	else if(DynsySta.StaRece == 7)	//无应答
@@ -2131,6 +2188,7 @@ void HmiErrorUpdate(void)
 			Errornumber = 0;
 			DynsySta.StaRece = 0;
 			// 判断是否够2秒
+			vTaskDelay(5);
 			if(!hmivar.op_delayflag){HmiUsart_Transmit(HmiUsart,(char *)fault_motor5,sizeof(fault_motor5));vTaskDelay(5);}
 		}
 		
@@ -2146,6 +2204,7 @@ void HmiErrorUpdate(void)
 			HMI_PRINTF("Tim3_Start()");
 			Errornumber = 0;
 			DynsySta.StaRece = 0;
+			vTaskDelay(5);
 			HmiUsart_Transmit(HmiUsart,(char *)fault_motor6,sizeof(fault_motor6));vTaskDelay(5);
 		}
 		
@@ -2158,6 +2217,7 @@ void HmiErrorUpdate(void)
 			Tim3_Stop();
 			HMI_PRINTF("Tim3_Stop()");
 			Errornumber = 0;
+			vTaskDelay(5);
 			HmiUsart_Transmit(HmiUsart,(char *)fault_clear,sizeof(fault_clear));vTaskDelay(5);
 		}
 	}
@@ -2169,6 +2229,7 @@ void HmiErrorUpdate(void)
 			Tim3_Stop();
 			HMI_PRINTF("Tim3_Stop()");
 			Errornumber = 0;
+			vTaskDelay(5);
 			HmiUsart_Transmit(HmiUsart,(char *)fault_clear,sizeof(fault_clear));vTaskDelay(5);
 		}
 	}
@@ -2178,6 +2239,7 @@ void HmiErrorUpdate(void)
 		Tim3_Stop();
 		HMI_PRINTF("Tim3_Stop()");
 		Errornumber = 0;
+		vTaskDelay(5);
 		HmiUsart_Transmit(HmiUsart,(char *)fault_clear,sizeof(fault_clear));vTaskDelay(5);
 	}
 	if(DynsySta.StaRece == 1)
@@ -2437,6 +2499,42 @@ void  DynsyParam_settings(void)
 
 
 
+/**
+ * @brief 实时映射函数（每次处理一个当前值）
+ * @param current_value 当前输入的数值（如ADC采样值）
+ * @return 映射后的字节 0x00~0xFF
+ * @note  首次遇到 >1200 的值时，自动将其记为基准 base，
+ *        后续映射始终使用这个 base，不再改变。
+ */
+uint8_t map_real_time(uint16_t current_value)
+{
+    static uint16_t base = 0;       // 存储基准值
+    static int base_locked = 0;    // 基准是否已锁定
+
+    // 1. 若尚未找到 >1200 的基准，检查当前值
+    if (!base_locked) {
+        if (current_value > 1200) {
+            base = current_value;   // 记录第一个 >1200 的值作为基准
+            base_locked = 1;        // 锁定，之后不再更改
+        } else {
+            return 0x00;            // 基准未就绪，输出 0
+        }
+    }
+
+    // 2. 基于已锁定的 base 进行映射
+    if (current_value <= base) {
+        return 0x00;
+    } else if (current_value >= base + 100) {
+        return 0xFF;
+    } else {
+        // 线性映射：(current_value - base) * 255 / 50
+        uint32_t tmp = (uint32_t)(current_value - base) * 255;
+        return (uint8_t)(tmp / 50);
+    }
+}
+
+
+
 void hmi_task_init(void)
 {
 	taskENTER_CRITICAL();           /* 进入临界区 */
@@ -2466,7 +2564,8 @@ void hmi_task_init(void)
 void HMI_TASK(void *pvParameters)
 {
 	uint8_t val_flag = 0;		//脚踏是否使用检测速度	
-	uint8_t tim_flag = 0;		//给一个延迟时间
+	uint8_t tim_flag = 0;			//给一个延迟时间
+	uint8_t sensertimflag = 0;		//给一个延迟时间
 	static uint8_t num = 3;
 	
 	vTaskDelay(500);                                             
@@ -2530,7 +2629,6 @@ void HMI_TASK(void *pvParameters)
 
     while(1)
     {
-		
 		HmiReceiveDate();		//接收屏幕数据处理
 		HmiPowerUpdate();		//脚踏电机开关图标
 		HmiGearUpdate();		//脚踏更新挡位图标
@@ -2552,15 +2650,32 @@ void HMI_TASK(void *pvParameters)
 			if(tim_flag > 10)	//给10ms一个延迟时间
 			{
 				DynsySta.speed_num = 0; //必须速度清零
-				HMI_PRINTF("关闭速度图标");
+				//HMI_PRINTF("关闭速度图标");
 				tim_flag = 0;	//计数清零
 				val_flag = 0;  //延时状态清零
 				HmiSpeedUpdate(footvar.foot_gear);
 			}
 			tim_flag++;
 		}
+		
+		
+		if(sensertimflag > 20 && footvar.pressensor)
+		{
+			if((pairsval.pressvalue2 > 1200) && (pairsval.pressvalue2 < 4096))
+			{
+				//HMI_PRINTF("press = %d",pairsval.pressvalue2);
+				sensertimflag = 0;
+				uint8_t out = map_real_time(pairsval.pressvalue2);
+				him_display[10] = out;
+				HmiUsart_Transmit(HmiUsart,(char *)him_display,sizeof(him_display));
+			}
+		}
+		
+		sensertimflag++;
 		/************************************************************/
         vTaskDelay(1);                                               /* 延时1ticks 进行任务调度 */
+		
+		
     }
 }
 

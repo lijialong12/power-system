@@ -28,14 +28,25 @@
 
 typedef struct{
 
-uint8_t  	Link1;			//0 手柄1未连接  1 手柄1连接	
-uint8_t  	Link2;			//0 手柄2未连接  1 手柄2连接	
-uint8_t  	Link1_Numb;			//0 手柄1接口没有手柄  手柄1接口手柄1  手柄1接口手柄2 
-uint8_t  	Link2_Numb;			//0 手柄2接口没有手柄  手柄2接口手柄1  手柄2接口手柄2 
+uint8_t  	Link1;						//0 手柄1未连接  1 手柄1连接	
+uint8_t  	Link2;						//0 手柄2未连接  1 手柄2连接	
+uint8_t  	Link1_Numb;					//0 手柄1接口没有手柄  手柄1接口手柄1  手柄1接口手柄2 
+uint8_t  	Link2_Numb;					//0 手柄2接口没有手柄  手柄2接口手柄1  手柄2接口手柄2 
+uint8_t  	hande1_send_interval;		//常规发送间隔 hande1_send_interval	ms
+uint8_t  	Rerror1;					//连续Rerror1次失败，标记离线	
+uint8_t  	hande2_send_interval;		//常规发送间隔：hande2_send_interval ms	
+uint8_t	 	Rerror2;					//连续Rerror2次失败，标记离线
 } HANDLE;
 
 
+/* 存储一对整数的结构 */
+typedef struct {
+    int gyrosvalue1;
+    int pressvalue2;
+} AthPair;
 
+
+extern AthPair pairsval;
 extern HANDLE	handle;
 
 

@@ -960,7 +960,7 @@ static void foot_motorspeed_control(void)
 		if(pairsval.pressvalue2 > CALIBRATION 
 		   && pairsval.pressvalue2 < 4096)  // ★ 加合理范围过滤，滤掉野值
 		{
-			//FOOT_PRINTF(" 压力值 = %d",pairsval.pressvalue2);
+			FOOT_PRINTF(" 压力值 = %d",pairsval.pressvalue2);
 			shift_and_add(buffsensval,&numb,&value_max,&value_min,&max_index,&min_index,pairsval.pressvalue2);	//赋值给缓冲区数组
 			if(numb >= BUFFER_SIZE)	//数组元素大于缓存长度
 			{		
